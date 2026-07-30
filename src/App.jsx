@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, List, ListOrdered, Highlighter, ArrowRight, FileText } from 'lucide-react';
 
 const TREND_COLORS = { up: '#22C55E', down: '#EF4444', same: '#FF8A00' };
 
@@ -159,6 +159,50 @@ const HybridInput = ({ value, onChange, max }) => {
   );
 };
 
+// === עורך טקסט מעוצב ליומן (לא-מבוקר בכוונה - כותב ל-DOM ישירות כדי לשמור על מיקום הסמן בזמן הקלדה) ===
+const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.innerHTML = initialValue || '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const exec = (cmd, arg) => {
+    ref.current?.focus();
+    document.execCommand(cmd, false, arg);
+    onChange(ref.current.innerHTML);
+  };
+
+  return (
+    <div className="border border-[#3A4155] rounded-xl overflow-hidden bg-[#0F1115]">
+      <div className="flex items-center gap-1 p-2 border-b border-[#3A4155] bg-[#161920]">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')} className="p-2 rounded-lg hover:bg-[#2A2F3D] text-[#E0E2E7]" aria-label="הדגשה">
+          <Bold size={14} />
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertUnorderedList')} className="p-2 rounded-lg hover:bg-[#2A2F3D] text-[#E0E2E7]" aria-label="רשימת נקודות">
+          <List size={14} />
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertOrderedList')} className="p-2 rounded-lg hover:bg-[#2A2F3D] text-[#E0E2E7]" aria-label="רשימה ממוספרת">
+          <ListOrdered size={14} />
+        </button>
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('hiliteColor', '#FF8A00')} className="p-2 rounded-lg hover:bg-[#2A2F3D] text-[#FF8A00]" aria-label="הדגשת רקע">
+          <Highlighter size={14} />
+        </button>
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={() => onChange(ref.current.innerHTML)}
+        data-placeholder={placeholder}
+        className="journal-content p-3 min-h-[90px] max-h-[50vh] overflow-y-auto text-sm text-[#E0E2E7] leading-relaxed outline-none"
+        style={{ direction: 'rtl' }}
+      />
+    </div>
+  );
+};
+
 // === גרף אינטראקטיבי מושלם ===
 const SmartLineChart = ({ data }) => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -292,9 +336,15 @@ export default function App() {
   const [filterZone, setFilterZone] = useState(GROUP_ORDER[0]);
   const [filterSpot, setFilterSpot] = useState(SPOTS[0].id);
 
+  const [journalSessionId, setJournalSessionId] = useState(null);
+
   useEffect(() => {
     mainRef.current?.scrollTo(0, 0);
-  }, [activeTab]);
+  }, [activeTab, journalSessionId]);
+
+  useEffect(() => {
+    if (settings.showJournal === false && activeTab === 'journal') setActiveTab('court');
+  }, [settings.showJournal, activeTab]);
 
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_DATA_KEY);
@@ -389,7 +439,25 @@ export default function App() {
         setEditingId(null);
         setCurrentInput({});
       }
+      if (journalSessionId === id) setJournalSessionId(null);
     }
+  };
+
+  const updateSessionNotes = (sessionId, field, html) => {
+    setSessions(prev => prev.map(s => {
+      if (s.id !== sessionId) return s;
+      const notes = s.notes || { general: '', zones: {} };
+      if (field === 'general') return { ...s, notes: { ...notes, general: html } };
+      return { ...s, notes: { ...notes, zones: { ...(notes.zones || {}), [field]: html } } };
+    }));
+  };
+
+  const hasNotes = (session) => {
+    const notes = session.notes;
+    if (!notes) return false;
+    const strip = (html) => (html || '').replace(/<[^>]*>/g, '').trim();
+    if (strip(notes.general)) return true;
+    return Object.values(notes.zones || {}).some(html => strip(html));
   };
 
   const clearAllData = () => {
@@ -686,7 +754,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="border-t border-[#2A2F3D] pt-6 mb-6">
+              <div className="border-t border-[#2A2F3D] pt-6 mb-4 space-y-3">
                 <div className="flex items-center justify-between bg-[#0F1115] p-4 rounded-2xl border border-[#2A2F3D]">
                   <div>
                     <p className="text-white font-bold text-sm">הצגת מסקנות</p>
@@ -698,6 +766,20 @@ export default function App() {
                     className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${settings.showInsights === false ? 'bg-[#3A4155]' : 'bg-[#FF8A00]'}`}
                   >
                     <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${settings.showInsights === false ? 'right-1' : 'right-6'}`}></span>
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between bg-[#0F1115] p-4 rounded-2xl border border-[#2A2F3D]">
+                  <div>
+                    <p className="text-white font-bold text-sm">הצגת יומן</p>
+                    <p className="text-[#848B98] text-[10px] mt-0.5">טאב יומן להערות על כל אימון (ההערות עצמן לא נמחקות בכיבוי)</p>
+                  </div>
+                  <button
+                    onClick={() => setSettings(prev => ({ ...prev, showJournal: prev.showJournal === false }))}
+                    aria-label="הצג או הסתר יומן"
+                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${settings.showJournal === false ? 'bg-[#3A4155]' : 'bg-[#FF8A00]'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${settings.showJournal === false ? 'right-1' : 'right-6'}`}></span>
                   </button>
                 </div>
               </div>
@@ -1078,6 +1160,98 @@ export default function App() {
 
           </div>
         )}
+
+        {/* יומן */}
+        {activeTab === 'journal' && settings.showJournal !== false && !showSettingsModal && (() => {
+          const journalSession = sessions.find(s => s.id === journalSessionId);
+
+          if (!journalSession) {
+            return (
+              <div className="p-4 animate-in fade-in pb-10">
+                <h2 className="text-xl font-bold text-white mb-1">יומן אימונים</h2>
+                <p className="text-sm text-[#848B98] mb-6">כתוב לעצמך הערות מעוצבות על כל אימון - כללי או לפי אזור במגרש.</p>
+
+                {sessions.length === 0 ? (
+                  <p className="text-[#848B98] text-sm text-center py-10">אין עדיין אימונים שמורים.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {sessions.map((session, idx) => {
+                      let sMade = 0;
+                      const sTotal = Object.keys(session.data).length * session.targetShots;
+                      Object.values(session.data).forEach(v => sMade += v);
+                      const sPerc = sTotal > 0 ? Math.round((sMade / sTotal) * 100) : 0;
+                      const noted = hasNotes(session);
+                      return (
+                        <button
+                          key={session.id}
+                          onClick={() => setJournalSessionId(session.id)}
+                          className="w-full text-right bg-[#1C202A] p-4 rounded-xl border border-[#2A2F3D] flex justify-between items-center hover:border-[#FF8A00]/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${noted ? 'bg-[#FF8A00]/20' : 'bg-[#0F1115]'}`}>
+                              <FileText size={14} className={noted ? 'text-[#FF8A00]' : 'text-[#596070]'} />
+                            </div>
+                            <div>
+                              <p className="text-white font-bold text-sm">אימון {sessions.length - idx}</p>
+                              <p className="text-[10px] text-[#848B98] mt-0.5">{new Date(session.date).toLocaleString('he-IL')}</p>
+                              <p className="text-[10px] mt-0.5" style={{ color: noted ? '#FF8A00' : '#596070' }}>{noted ? 'יש הערות' : 'אין הערות עדיין'}</p>
+                            </div>
+                          </div>
+                          <span className="text-lg font-black text-[#FF8A00]">{sPerc}%</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          let jMade = 0;
+          const jTotal = Object.keys(journalSession.data).length * journalSession.targetShots;
+          Object.values(journalSession.data).forEach(v => jMade += v);
+          const jPerc = jTotal > 0 ? Math.round((jMade / jTotal) * 100) : 0;
+
+          return (
+            <div className="p-4 animate-in slide-in-from-bottom-4 pb-10">
+              <button onClick={() => setJournalSessionId(null)} className="flex items-center gap-1.5 text-[#848B98] text-sm font-bold mb-4">
+                <ArrowRight size={16} /> חזרה ליומן
+              </button>
+
+              <div className="bg-[#1C202A] p-4 rounded-2xl border border-[#2A2F3D] flex justify-between items-center mb-6">
+                <div>
+                  <p className="text-white font-bold text-sm">{new Date(journalSession.date).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'numeric' })}</p>
+                  <p className="text-[10px] text-[#848B98] mt-0.5" dir="ltr">{jMade}/{jTotal} קליעות</p>
+                </div>
+                <span className="text-xl font-black text-[#FF8A00]">{jPerc}%</span>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-white font-bold text-sm mb-2">הערה כללית</h3>
+                <RichTextEditor
+                  key={`general-${journalSession.id}`}
+                  initialValue={journalSession.notes?.general}
+                  onChange={(html) => updateSessionNotes(journalSession.id, 'general', html)}
+                  placeholder="מה חשבת על האימון הזה? מה עבד טוב, מה כדאי לשפר..."
+                />
+              </div>
+
+              <div className="space-y-5">
+                {GROUP_ORDER.map(group => (
+                  <div key={group}>
+                    <h3 className="text-white font-bold text-sm mb-2">{group}</h3>
+                    <RichTextEditor
+                      key={`zone-${group}-${journalSession.id}`}
+                      initialValue={journalSession.notes?.zones?.[group]}
+                      onChange={(html) => updateSessionNotes(journalSession.id, group, html)}
+                      placeholder={`הערות על "${group}"...`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </main>
 
       {/* תפריט תחתון */}
@@ -1097,6 +1271,13 @@ export default function App() {
             <TrendingUp size={22} />
             <span className="text-[9px] font-bold tracking-wider">סטטיסטיקות</span>
           </button>
+
+          {settings.showJournal !== false && (
+            <button onClick={() => {setActiveTab('journal'); setShowSettingsModal(false);}} className={`flex flex-col items-center gap-1 transition-colors p-2 ${activeTab === 'journal' && !showSettingsModal ? 'text-[#FF8A00]' : 'text-[#848B98]'}`}>
+              <BookOpen size={22} />
+              <span className="text-[9px] font-bold tracking-wider">יומן</span>
+            </button>
+          )}
         </div>
       </nav>
     </div>
