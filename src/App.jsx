@@ -634,8 +634,8 @@ export default function App() {
                 <line x1="38" y1="12" x2="62" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                 <circle cx="50" cy="16" r="3.5" fill="#FF4D4D" stroke="white" strokeWidth="1" />
 
-                {/* קשת 3 - קווים ישרים בפינות (X:6/94) עד גובה הסל, ואז קשת אמיתית ברדיוס 74 סביב מרכז הסל (50,16) */}
-                <path d="M 6 0 L 6 75.5 A 74 74 0 0 0 94 75.5 L 94 0" fill="none" stroke="white" strokeWidth="1.2" />
+                {/* קשת 3 - אליפסה אמיתית (רדיוס אופקי 44, אנכי 74) סביב מרכז הסל (50,16), עוברת בול דרך הפינות בגובה הסל ודרך הנקודה העמוקה מול הסל */}
+                <path d="M 6 0 L 6 16 A 44 74 0 0 0 94 16 L 94 0" fill="none" stroke="white" strokeWidth="1.2" />
               </svg>
 
               {SPOTS.map((spot) => {
