@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, List, ListOrdered, Highlighter, ArrowRight, FileText } from 'lucide-react';
 
-const TREND_COLORS = { up: '#22C55E', down: '#EF4444', same: '#FF8A00' };
+const TREND_COLORS = { up: '#3E9C6E', down: '#C4534A', same: '#FF8A00' };
 
 // משווה בין ציון נוכחי לציון קודם ומחזיר 'up' (שיא נשבר) / 'down' / 'same' / null (אין נתון להשוואה)
 const getTrend = (current, previous) => {
@@ -222,7 +222,6 @@ const SmartLineChart = ({ data }) => {
   const getSvgY = (percentage) => 100 - percentage;
 
   const svgPoints = chartData.map((d, i) => `${getX(i)},${getSvgY(d.percentage)}`).join(' ');
-  const activeColor = activeData.trend ? TREND_COLORS[activeData.trend] : '#FF8A00';
 
   return (
     <div className="w-full relative pt-2 pb-6">
@@ -232,8 +231,8 @@ const SmartLineChart = ({ data }) => {
           <p className="text-[#848B98] text-[10px] uppercase tracking-wider mb-0.5">{activeData.fullDate}</p>
           <p className="text-white font-bold text-xs">תוצאת אימון נבחר</p>
         </div>
-        <div className="text-2xl font-black drop-shadow-md" style={{ color: activeColor }}>
-          {activeData.percentage.toFixed(0)}<span className="text-sm">%</span>
+        <div className="text-2xl font-black text-[#FF8A00] drop-shadow-md">
+          {activeData.percentage.toFixed(0)}<span className="text-sm text-[#FF8A00]">%</span>
         </div>
       </div>
 
@@ -247,19 +246,8 @@ const SmartLineChart = ({ data }) => {
         <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none">
           {chartData.length > 1 && (
             <>
-              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#orange-grad)" opacity="0.12"/>
-              {chartData.slice(1).map((d, idx) => {
-                const i = idx + 1;
-                const segColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
-                return (
-                  <line
-                    key={i}
-                    x1={getX(i - 1)} y1={getSvgY(chartData[i - 1].percentage)}
-                    x2={getX(i)} y2={getSvgY(d.percentage)}
-                    stroke={segColor} strokeWidth="2.5" strokeLinecap="round"
-                  />
-                );
-              })}
+              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#orange-grad)" opacity="0.15"/>
+              <polyline points={svgPoints} fill="none" stroke="#FF8A00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             </>
           )}
           <defs>
@@ -272,7 +260,6 @@ const SmartLineChart = ({ data }) => {
 
         {chartData.map((d, i) => {
           const isActive = i === safeActiveIndex;
-          const dotColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
 
           return (
             <div
@@ -282,17 +269,12 @@ const SmartLineChart = ({ data }) => {
               onClick={() => setActiveIndex(i)}
             >
               {isActive && (
-                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed" style={{ left: '50%', borderColor: `${dotColor}80` }}></div>
+                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed border-[#FF8A00]/50" style={{ left: '50%' }}></div>
               )}
               <div
                 className={`absolute rounded-full transform -translate-x-1/2 translate-y-1/2 transition-all duration-300
-                  ${isActive ? 'w-4 h-4 border-[3px] border-[#1C202A] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px]'}`}
-                style={{
-                  left: '50%', bottom: `${d.percentage}%`,
-                  backgroundColor: isActive ? dotColor : '#0F1115',
-                  borderColor: dotColor,
-                  boxShadow: isActive ? `0 0 12px ${dotColor}CC` : 'none'
-                }}
+                  ${isActive ? 'w-4 h-4 bg-[#FF8A00] border-[3px] border-[#1C202A] shadow-[0_0_12px_rgba(255,138,0,0.8)] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px] border-[#FF8A00]'}`}
+                style={{ left: '50%', bottom: `${d.percentage}%` }}
               ></div>
             </div>
           );
@@ -302,14 +284,13 @@ const SmartLineChart = ({ data }) => {
       <div className="relative h-6 mt-3 w-full">
         {chartData.map((d, i) => {
           const isActive = i === safeActiveIndex;
-          const dotColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
           return (
             <div
               key={i}
               onClick={() => setActiveIndex(i)}
               className={`absolute transform -translate-x-1/2 text-[9px] text-center font-bold cursor-pointer transition-colors px-1.5 py-1 rounded-md whitespace-nowrap
-                ${isActive ? '' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
-              style={{ left: `${getX(i)}%`, top: 0, ...(isActive ? { color: dotColor, backgroundColor: `${dotColor}1A` } : {}) }}
+                ${isActive ? 'text-[#FF8A00] bg-[#FF8A00]/10' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
+              style={{ left: `${getX(i)}%`, top: 0 }}
             >
               {d.shortDate}
             </div>
@@ -337,13 +318,14 @@ export default function App() {
   const [filterSpot, setFilterSpot] = useState(SPOTS[0].id);
 
   const [journalSessionId, setJournalSessionId] = useState(null);
+  const [expandedZones, setExpandedZones] = useState({});
 
   useEffect(() => {
     mainRef.current?.scrollTo(0, 0);
   }, [activeTab, journalSessionId]);
 
   useEffect(() => {
-    if (settings.showJournal === false && activeTab === 'journal') setActiveTab('court');
+    if (settings.showJournal !== true && activeTab === 'journal') setActiveTab('court');
   }, [settings.showJournal, activeTab]);
 
   useEffect(() => {
@@ -506,13 +488,34 @@ export default function App() {
     ? (sessions.find(s => s.id === editingId)?.targetShots || settings.targetShots)
     : settings.targetShots;
 
-  const sessionOverallPerc = (session) => {
+  const sessionMadeAttempts = (session) => {
     if (!session) return null;
     const values = Object.values(session.data);
     const total = values.length * session.targetShots;
-    if (total === 0) return null;
     const made = values.reduce((a, b) => a + b, 0);
-    return Math.round((made / total) * 100);
+    return { made, total };
+  };
+
+  // עד 10 האימונים האחרונים עם נתונים לאזור נתון, מהחדש לישן, כל אחד עם מגמה מול זה שאחריו (גם אם הוא מחוץ ל-10)
+  const getZoneHistory = (group) => {
+    const rows = [];
+    sessions.forEach(session => {
+      let made = 0, attempts = 0;
+      SPOTS.filter(s => s.group === group).forEach(spot => {
+        if (session.data[spot.id] !== undefined) {
+          made += session.data[spot.id];
+          attempts += session.targetShots;
+        }
+      });
+      if (attempts > 0) rows.push({ id: session.id, date: session.date, made, attempts, perc: Math.round((made / attempts) * 100) });
+    });
+    return rows.slice(0, 10).map((r, i) => ({ ...r, trend: rows[i + 1] ? getTrend(r.perc, rows[i + 1].perc) : null }));
+  };
+
+  const sessionOverallPerc = (session) => {
+    const ma = sessionMadeAttempts(session);
+    if (!ma || ma.total === 0) return null;
+    return Math.round((ma.made / ma.total) * 100);
   };
 
   const latestSessionPerc = useMemo(() => sessionOverallPerc(latestSession) ?? 0, [latestSession]);
@@ -599,12 +602,7 @@ export default function App() {
         hasData: total > 0
       };
     });
-    // raw הוא מהחדש לישן (כמו sessions). אחרי הסינון, כל נקודה מושווית לנקודה שאחריה במערך (=הישנה ממנה, לצורך "שבירת שיא")
-    const filtered = raw.filter(d => d.hasData);
-    return filtered.map((d, i) => {
-      const older = filtered[i + 1];
-      return { ...d, trend: older ? getTrend(d.percentage, older.percentage) : null };
-    });
+    return raw.filter(d => d.hasData);
   }, [sessions, filterMode, filterZone, filterSpot]);
 
   const insights = useMemo(() => {
@@ -613,9 +611,14 @@ export default function App() {
 
     if (comparisonSession && comparisonSessionPerc !== null) {
       const diff = latestSessionPerc - comparisonSessionPerc;
-      if (diff > 0) list.push({ type: 'up', text: `השתפרת ב-${diff} נקודות אחוז לעומת האימון הקודם. כל הכבוד!` });
-      else if (diff < 0) list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)} נקודות אחוז לעומת האימון הקודם - זה קורה, תמשיך להתאמן.` });
-      else list.push({ type: 'same', text: 'נשארת בדיוק על אותו אחוז כמו באימון הקודם.' });
+      const prevMA = sessionMadeAttempts(comparisonSession);
+      if (diff > 0) {
+        list.push({ type: 'up', text: `השתפרת ב-${diff}%: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, לעומת ${prevMA.made}/${prevMA.total} באימון הקודם. כל הכבוד!` });
+      } else if (diff < 0) {
+        list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)}%: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, לעומת ${prevMA.made}/${prevMA.total} באימון הקודם - זה קורה, תמשיך להתאמן.` });
+      } else {
+        list.push({ type: 'same', text: `נשארת יציב: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, בדיוק כמו באימון הקודם.` });
+      }
 
       let bestZone = null, bestDelta = 0;
       GROUP_ORDER.forEach(g => {
@@ -625,7 +628,10 @@ export default function App() {
           if (delta > bestDelta) { bestDelta = delta; bestZone = g; }
         }
       });
-      if (bestZone) list.push({ type: 'up', text: `האזור עם השיפור הגדול ביותר: "${bestZone}" (+${bestDelta}%)` });
+      if (bestZone) {
+        const zd = stats.zoneData[bestZone];
+        list.push({ type: 'up', text: `האזור "${bestZone}" השתפר הכי הרבה: עלית ב-${bestDelta}% - קלעת ${zd.lastMade}/${zd.lastAttempts} באימון האחרון, לעומת ${zd.prevMade}/${zd.prevAttempts} באימון הקודם.` });
+      }
     } else {
       list.push({ type: 'same', text: 'זהו האימון הראשון שלך שנשמר - מכאן והלאה תוכל לעקוב אחרי ההתקדמות שלך!' });
     }
@@ -638,7 +644,10 @@ export default function App() {
         if (lp < weakPerc) { weakPerc = lp; weakZone = g; }
       }
     });
-    if (weakZone) list.push({ type: 'down', text: `הכי כדאי להתמקד באזור "${weakZone}" (${weakPerc}%) באימון הבא.` });
+    if (weakZone) {
+      const zd = stats.zoneData[weakZone];
+      list.push({ type: 'down', text: `הכי כדאי להתמקד באזור "${weakZone}": קלעת רק ${zd.lastMade}/${zd.lastAttempts} (${weakPerc}%) באימון האחרון, ו-${zd.allTimeMade}/${zd.allTimeAttempts} בסך הכל.` });
+    }
 
     return list;
   }, [latestSession, comparisonSession, comparisonSessionPerc, latestSessionPerc, stats]);
@@ -775,11 +784,11 @@ export default function App() {
                     <p className="text-[#848B98] text-[10px] mt-0.5">טאב יומן להערות על כל אימון (ההערות עצמן לא נמחקות בכיבוי)</p>
                   </div>
                   <button
-                    onClick={() => setSettings(prev => ({ ...prev, showJournal: prev.showJournal === false }))}
+                    onClick={() => setSettings(prev => ({ ...prev, showJournal: prev.showJournal !== true }))}
                     aria-label="הצג או הסתר יומן"
-                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${settings.showJournal === false ? 'bg-[#3A4155]' : 'bg-[#FF8A00]'}`}
+                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${settings.showJournal === true ? 'bg-[#FF8A00]' : 'bg-[#3A4155]'}`}
                   >
-                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${settings.showJournal === false ? 'right-1' : 'right-6'}`}></span>
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${settings.showJournal === true ? 'right-6' : 'right-1'}`}></span>
                   </button>
                 </div>
               </div>
@@ -1083,37 +1092,74 @@ export default function App() {
                   const zoneTrendColor = zoneTrend ? TREND_COLORS[zoneTrend] : '#FF8A00';
                   const allPerc = Math.round((data.allTimeMade / data.allTimeAttempts) * 100);
 
+                  const isExpanded = !!expandedZones[group];
+
                   return (
                     <div key={group} className="bg-[#1C202A] p-4 rounded-xl border border-[#2A2F3D]">
-                      <h4 className="font-bold text-white text-sm mb-3 border-b border-[#2A2F3D] pb-2">{group}</h4>
-
-                      {/* פס אימון אחרון */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="w-20">
-                          <p className="text-[9px] font-bold uppercase" style={{ color: zoneTrendColor }}>אימון אחרון</p>
-                          <p dir="ltr" className="text-[11px] text-[#A0A6B1]">{data.lastMade}/{data.lastAttempts}</p>
-                        </div>
-                        <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
-                          <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
-                        </div>
-                        <div className="w-8 text-right">
-                          <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
-                        </div>
+                      <div className="flex items-center justify-between mb-3 border-b border-[#2A2F3D] pb-2">
+                        <h4 className="font-bold text-white text-sm">{group}</h4>
+                        <button
+                          onClick={() => setExpandedZones(prev => ({ ...prev, [group]: !prev[group] }))}
+                          aria-label="הרחב היסטוריה מפורטת לאזור"
+                          className="text-[#848B98] hover:text-[#FF8A00] p-1 -m-1 transition-colors"
+                        >
+                          <ChevronDown size={16} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                        </button>
                       </div>
 
-                      {/* פס כל הזמנים */}
-                      <div className="flex items-center justify-between opacity-70">
-                        <div className="w-20">
-                          <p className="text-[9px] text-[#848B98] font-bold uppercase">כל הזמנים</p>
-                          <p dir="ltr" className="text-[11px] text-[#848B98]">{data.allTimeMade}/{data.allTimeAttempts}</p>
+                      {isExpanded ? (
+                        <div className="space-y-2.5">
+                          {getZoneHistory(group).map(row => {
+                            const rowColor = row.trend ? TREND_COLORS[row.trend] : '#FF8A00';
+                            return (
+                              <div key={row.id} className="flex items-center justify-between">
+                                <div className="w-20">
+                                  <p className="text-[9px] font-bold" style={{ color: rowColor }}>
+                                    {new Date(row.date).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' })}
+                                  </p>
+                                  <p dir="ltr" className="text-[11px] text-[#A0A6B1]">{row.made}/{row.attempts}</p>
+                                </div>
+                                <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
+                                  <div className="h-full rounded-full" style={{ width: `${row.perc}%`, backgroundColor: rowColor }} />
+                                </div>
+                                <div className="w-8 text-right">
+                                  <span className="font-black text-xs" style={{ color: rowColor }}>{row.perc}%</span>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
-                          <div className="h-full bg-[#848B98] rounded-full" style={{ width: `${allPerc}%` }} />
-                        </div>
-                        <div className="w-8 text-right">
-                          <span className="font-bold text-[#848B98] text-xs">{allPerc}%</span>
-                        </div>
-                      </div>
+                      ) : (
+                        <>
+                          {/* פס אימון אחרון */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="w-20">
+                              <p className="text-[9px] font-bold uppercase" style={{ color: zoneTrendColor }}>אימון אחרון</p>
+                              <p dir="ltr" className="text-[11px] text-[#A0A6B1]">{data.lastMade}/{data.lastAttempts}</p>
+                            </div>
+                            <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
+                              <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
+                            </div>
+                            <div className="w-8 text-right">
+                              <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
+                            </div>
+                          </div>
+
+                          {/* פס כל הזמנים */}
+                          <div className="flex items-center justify-between opacity-70">
+                            <div className="w-20">
+                              <p className="text-[9px] text-[#848B98] font-bold uppercase">כל הזמנים</p>
+                              <p dir="ltr" className="text-[11px] text-[#848B98]">{data.allTimeMade}/{data.allTimeAttempts}</p>
+                            </div>
+                            <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
+                              <div className="h-full bg-[#848B98] rounded-full" style={{ width: `${allPerc}%` }} />
+                            </div>
+                            <div className="w-8 text-right">
+                              <span className="font-bold text-[#848B98] text-xs">{allPerc}%</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })}
@@ -1129,6 +1175,9 @@ export default function App() {
                   let sTotal = Object.keys(session.data).length * session.targetShots;
                   Object.values(session.data).forEach(v => sMade += v);
                   const sPerc = sTotal > 0 ? Math.round((sMade / sTotal) * 100) : 0;
+                  const sOlderPerc = sessionOverallPerc(sessions[idx + 1]);
+                  const sTrend = getTrend(sPerc, sOlderPerc);
+                  const sTrendColor = sTrend ? TREND_COLORS[sTrend] : '#FF8A00';
 
                   return (
                     <div key={session.id} className="bg-[#1C202A] p-4 rounded-xl border border-[#2A2F3D] flex justify-between items-center relative overflow-hidden group">
@@ -1139,7 +1188,7 @@ export default function App() {
 
                       <div className="flex items-center gap-4">
                         <div className="text-right mr-2">
-                          <p className="text-lg font-black text-[#FF8A00]">{sPerc}%</p>
+                          <p className="text-lg font-black" style={{ color: sTrendColor }}>{sPerc}%</p>
                           <p className="text-[9px] text-[#848B98]"><span dir="ltr">{sMade}/{sTotal}</span> קליעות</p>
                         </div>
 
@@ -1162,7 +1211,7 @@ export default function App() {
         )}
 
         {/* יומן */}
-        {activeTab === 'journal' && settings.showJournal !== false && !showSettingsModal && (() => {
+        {activeTab === 'journal' && settings.showJournal === true && !showSettingsModal && (() => {
           const journalSession = sessions.find(s => s.id === journalSessionId);
 
           if (!journalSession) {
@@ -1272,7 +1321,7 @@ export default function App() {
             <span className="text-[9px] font-bold tracking-wider">סטטיסטיקות</span>
           </button>
 
-          {settings.showJournal !== false && (
+          {settings.showJournal === true && (
             <button onClick={() => {setActiveTab('journal'); setShowSettingsModal(false);}} className={`flex flex-col items-center gap-1 transition-colors p-2 ${activeTab === 'journal' && !showSettingsModal ? 'text-[#FF8A00]' : 'text-[#848B98]'}`}>
               <BookOpen size={22} />
               <span className="text-[9px] font-bold tracking-wider">יומן</span>
