@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity } from 'lucide-react';
 
 // === מיקומי המגרש המעודכנים מתמטית ברמת הפיקסל! ===
@@ -31,10 +31,10 @@ const SPOTS = [
   { id: 17, name: 'אמצע הצבע (8)', group: 'מול הסל', x: 50, y: 30 },
   { id: 18, name: 'מתחת לסל', group: 'מול הסל', x: 50, y: 22 },
 
-  // שלשות: מתמטית נועלים את הקשת
-  { id: 19, name: 'שלשה פינה שמאל', group: 'שלשות', x: 6, y: 16 },
-  { id: 20, name: 'שלשה אמצע', group: 'שלשות', x: 50, y: 92 }, // תוקן! יושב בול על נקודת המקסימום של הקשת.
-  { id: 21, name: 'שלשה פינה ימין', group: 'שלשות', x: 94, y: 16 }
+  // שלשות: על קשת אמיתית (חצי עיגול) ברדיוס 44 סביב הסל (מרכז X:50 Y:36), משיקה לעיגול העונשין ב-Y:80
+  { id: 19, name: 'שלשה פינה שמאל', group: 'שלשות', x: 6, y: 36 },
+  { id: 20, name: 'שלשה אמצע', group: 'שלשות', x: 50, y: 80 },
+  { id: 21, name: 'שלשה פינה ימין', group: 'שלשות', x: 94, y: 36 }
 ];
 
 const GROUP_ORDER = ['צד שמאל', 'אופקי', 'צד ימין', 'מול הסל', 'שלשות'];
@@ -238,6 +238,7 @@ const SmartLineChart = ({ data }) => {
 
 
 export default function App() {
+  const mainRef = useRef(null);
   const [activeTab, setActiveTab] = useState('court');
   const [sessions, setSessions] = useState([]);
   const [settings, setSettings] = useState({ targetShots: 10 });
@@ -250,6 +251,10 @@ export default function App() {
   const [filterMode, setFilterMode] = useState('overall');
   const [filterZone, setFilterZone] = useState(GROUP_ORDER[0]);
   const [filterSpot, setFilterSpot] = useState(SPOTS[0].id);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo(0, 0);
+  }, [activeTab]);
 
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_DATA_KEY);
@@ -540,7 +545,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 min-h-0 overflow-y-auto w-full max-w-md mx-auto relative">
+      <main ref={mainRef} className="flex-1 min-h-0 overflow-y-auto w-full max-w-md mx-auto relative">
 
         {/* מודל הגדרות */}
         {showSettingsModal && (
@@ -595,8 +600,8 @@ export default function App() {
 
         {/* מגרש ראשי */}
         {activeTab === 'court' && !showSettingsModal && (
-          <div className="p-4 animate-in fade-in">
-            <div className="bg-[#1C202A] p-4 rounded-2xl mb-5 border border-[#2A2F3D] flex justify-between items-center shadow-lg">
+          <div className="h-full flex flex-col p-4 animate-in fade-in">
+            <div className="shrink-0 bg-[#1C202A] p-4 rounded-2xl mb-5 border border-[#2A2F3D] flex justify-between items-center shadow-lg">
               <div>
                 <p className="text-[#848B98] text-[10px] font-bold uppercase tracking-wider mb-1">
                   האימון האחרון
@@ -610,8 +615,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* איור מגרש מותאם מתמטית לחלוטין (viewBox: 0 0 100 125) */}
-            <div className="relative w-full aspect-[4/5] bg-[#C28657] rounded-3xl border-[6px] border-white shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+            {/* איור מגרש מותאם מתמטית לחלוטין (viewBox: 0 0 100 125), מוקטן לפי הגובה הפנוי כדי שלא יגלוש */}
+            <div className="flex-1 min-h-0 flex items-center justify-center">
+            <div className="relative h-full max-w-full aspect-[4/5] bg-[#C28657] rounded-3xl border-[6px] border-white shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden">
               <div className="absolute inset-0 opacity-15 flex flex-col justify-around pointer-events-none">
                 {[...Array(25)].map((_, i) => (
                   <div key={i} className="h-[2px] bg-black/40 w-full shadow-[0_1px_1px_rgba(255,255,255,0.1)]" />
@@ -628,8 +634,8 @@ export default function App() {
                 <line x1="38" y1="12" x2="62" y2="12" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
                 <circle cx="50" cy="16" r="3.5" fill="#FF4D4D" stroke="white" strokeWidth="1" />
 
-                {/* קשת 3 (FIBA) */}
-                <path d="M 6 0 L 6 25 Q 50 159 94 25 L 94 0" fill="none" stroke="white" strokeWidth="1.2" />
+                {/* קשת 3 - חצי עיגול אמיתי ברדיוס 44 סביב מרכז הסל (X:50 Y:36), משיק לעיגול העונשין ב-Y:80 */}
+                <path d="M 6 0 L 6 36 A 44 44 0 0 0 94 36 L 94 0" fill="none" stroke="white" strokeWidth="1.2" />
               </svg>
 
               {SPOTS.map((spot) => {
@@ -656,8 +662,9 @@ export default function App() {
                 );
               })}
             </div>
+            </div>
 
-            <div className="text-center mt-5 bg-[#1C202A] p-3 rounded-xl border border-[#2A2F3D]">
+            <div className="shrink-0 text-center mt-5 bg-[#1C202A] p-3 rounded-xl border border-[#2A2F3D]">
               <p className="text-[#E0E2E7] text-[11px] font-medium leading-relaxed">
                 מוצגות קליעות מהאימון האחרון מתוך <span className="text-[#FF8A00] font-bold">{latestSession?.targetShots || settings.targetShots} זריקות</span>.
               </p>
