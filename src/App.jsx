@@ -109,13 +109,24 @@ const HybridInput = ({ value, onChange, max }) => {
           min="0"
           max={safeMax}
           value={value !== undefined ? value : ''}
-          onClick={() => setIsOpen(true)}
+          onChange={(e) => {
+            const raw = e.target.value;
+            if (raw === '') { onChange(''); return; }
+            const v = parseInt(raw, 10);
+            if (Number.isFinite(v) && v >= 0 && v <= safeMax) onChange(v);
+          }}
           className="appearance-none w-[85px] bg-[#0F1115] text-white font-black text-lg rounded-xl pr-3 pl-8 py-2.5 border border-[#3A4155] focus:border-[#FF8A00] focus:ring-1 focus:ring-[#FF8A00] outline-none transition-all text-center shadow-inner"
           placeholder="-"
           style={{ direction: 'ltr' }}
-          readOnly
         />
-        <ChevronDown className="w-4 h-4 text-[#FF8A00] absolute left-3 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+        <button
+          type="button"
+          onClick={() => setIsOpen(o => !o)}
+          aria-label="בחר מספר מרשימה"
+          className="absolute left-2 top-1/2 transform -translate-y-1/2 p-1"
+        >
+          <ChevronDown className={`w-4 h-4 text-[#FF8A00] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
       </div>
 
       {isOpen && (
@@ -694,8 +705,8 @@ export default function App() {
 
             <div className="space-y-6">
               {GROUP_ORDER.map(group => (
-                <div key={group} className="bg-[#1C202A] rounded-2xl border border-[#2A2F3D] shadow-lg overflow-hidden">
-                  <div className="bg-[#212631] px-4 py-3 border-b border-[#2A2F3D] flex items-center gap-2">
+                <div key={group} className="bg-[#1C202A] rounded-2xl border border-[#2A2F3D] shadow-lg">
+                  <div className="bg-[#212631] px-4 py-3 border-b border-[#2A2F3D] rounded-t-2xl flex items-center gap-2">
                     <div className="w-6 h-6 rounded-full bg-[#FF8A00]/20 flex items-center justify-center">
                       <Target className="text-[#FF8A00] w-3.5 h-3.5" />
                     </div>
