@@ -726,9 +726,7 @@ export default function App() {
                           <div>
                             <span className="text-[#E0E2E7] font-bold text-sm block">{spot.name}</span>
                             {prevScore !== undefined ? (
-                              <span className="text-[#FF8A00] text-[10px] font-bold">
-                                אימון קודם: קלעת <span dir="ltr">{prevScore}/{previousSession.targetShots}</span>
-                              </span>
+                              <span className="text-[#FF8A00] text-[10px] font-bold">{`אימון קודם: קלעת ${prevScore}`}</span>
                             ) : (
                               <span className="text-[#596070] text-[10px] font-bold">טרם הוזן בעבר</span>
                             )}
