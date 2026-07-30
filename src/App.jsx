@@ -389,7 +389,10 @@ export default function App() {
   };
 
   const latestSession = sessions[0] || null;
-  const previousSession = editingId ? sessions.find(s => s.id !== editingId) : (sessions.length > 1 ? sessions[1] : null);
+  // כשיוצרים אימון חדש, האימון "הקודם" הוא פשוט האימון האחרון שכבר נשמר (sessions[0]) -
+  // הוא עדיין לא כלול במערך sessions באותה נקודה. בעריכת אימון קיים, "הקודם" הוא האימון
+  // האחרון שאינו זה שנערך כרגע.
+  const previousSession = editingId ? sessions.find(s => s.id !== editingId) : (sessions[0] || null);
 
   const currentTargetShots = editingId
     ? (sessions.find(s => s.id === editingId)?.targetShots || settings.targetShots)
@@ -722,9 +725,13 @@ export default function App() {
                         <div key={spot.id} className="flex items-center justify-between p-2">
                           <div>
                             <span className="text-[#E0E2E7] font-bold text-sm block">{spot.name}</span>
-                            <span className="text-[#596070] text-[10px] font-bold">
-                              {prevScore !== undefined ? `אימון קודם: קלעת ${prevScore}` : 'טרם הוזן בעבר'}
-                            </span>
+                            {prevScore !== undefined ? (
+                              <span className="text-[#FF8A00] text-[10px] font-bold">
+                                אימון קודם: קלעת <span dir="ltr">{prevScore}/{previousSession.targetShots}</span>
+                              </span>
+                            ) : (
+                              <span className="text-[#596070] text-[10px] font-bold">טרם הוזן בעבר</span>
+                            )}
                           </div>
 
                           <HybridInput
