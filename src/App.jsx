@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity } from 'lucide-react';
+import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus } from 'lucide-react';
+
+const TREND_COLORS = { up: '#22C55E', down: '#EF4444', same: '#FF8A00' };
+
+// משווה בין ציון נוכחי לציון קודם ומחזיר 'up' (שיא נשבר) / 'down' / 'same' / null (אין נתון להשוואה)
+const getTrend = (current, previous) => {
+  if (current === undefined || current === null || previous === undefined || previous === null) return null;
+  if (current > previous) return 'up';
+  if (current < previous) return 'down';
+  return 'same';
+};
 
 // === מיקומי המגרש המעודכנים מתמטית ברמת הפיקסל! ===
 // מערכת הצירים: 100 רוחב על 125 גובה
@@ -168,6 +178,7 @@ const SmartLineChart = ({ data }) => {
   const getSvgY = (percentage) => 100 - percentage;
 
   const svgPoints = chartData.map((d, i) => `${getX(i)},${getSvgY(d.percentage)}`).join(' ');
+  const activeColor = activeData.trend ? TREND_COLORS[activeData.trend] : '#FF8A00';
 
   return (
     <div className="w-full relative pt-2 pb-6">
@@ -177,8 +188,8 @@ const SmartLineChart = ({ data }) => {
           <p className="text-[#848B98] text-[10px] uppercase tracking-wider mb-0.5">{activeData.fullDate}</p>
           <p className="text-white font-bold text-xs">תוצאת אימון נבחר</p>
         </div>
-        <div className="text-2xl font-black text-[#FF8A00] drop-shadow-md">
-          {activeData.percentage.toFixed(0)}<span className="text-sm text-[#FF8A00]">%</span>
+        <div className="text-2xl font-black drop-shadow-md" style={{ color: activeColor }}>
+          {activeData.percentage.toFixed(0)}<span className="text-sm">%</span>
         </div>
       </div>
 
@@ -192,8 +203,19 @@ const SmartLineChart = ({ data }) => {
         <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none">
           {chartData.length > 1 && (
             <>
-              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#orange-grad)" opacity="0.15"/>
-              <polyline points={svgPoints} fill="none" stroke="#FF8A00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#orange-grad)" opacity="0.12"/>
+              {chartData.slice(1).map((d, idx) => {
+                const i = idx + 1;
+                const segColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
+                return (
+                  <line
+                    key={i}
+                    x1={getX(i - 1)} y1={getSvgY(chartData[i - 1].percentage)}
+                    x2={getX(i)} y2={getSvgY(d.percentage)}
+                    stroke={segColor} strokeWidth="2.5" strokeLinecap="round"
+                  />
+                );
+              })}
             </>
           )}
           <defs>
@@ -206,6 +228,7 @@ const SmartLineChart = ({ data }) => {
 
         {chartData.map((d, i) => {
           const isActive = i === safeActiveIndex;
+          const dotColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
 
           return (
             <div
@@ -215,12 +238,17 @@ const SmartLineChart = ({ data }) => {
               onClick={() => setActiveIndex(i)}
             >
               {isActive && (
-                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed border-[#FF8A00]/50" style={{ left: '50%' }}></div>
+                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed" style={{ left: '50%', borderColor: `${dotColor}80` }}></div>
               )}
               <div
                 className={`absolute rounded-full transform -translate-x-1/2 translate-y-1/2 transition-all duration-300
-                  ${isActive ? 'w-4 h-4 bg-[#FF8A00] border-[3px] border-[#1C202A] shadow-[0_0_12px_rgba(255,138,0,0.8)] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px] border-[#FF8A00]'}`}
-                style={{ left: '50%', bottom: `${d.percentage}%` }}
+                  ${isActive ? 'w-4 h-4 border-[3px] border-[#1C202A] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px]'}`}
+                style={{
+                  left: '50%', bottom: `${d.percentage}%`,
+                  backgroundColor: isActive ? dotColor : '#0F1115',
+                  borderColor: dotColor,
+                  boxShadow: isActive ? `0 0 12px ${dotColor}CC` : 'none'
+                }}
               ></div>
             </div>
           );
@@ -230,13 +258,14 @@ const SmartLineChart = ({ data }) => {
       <div className="relative h-6 mt-3 w-full">
         {chartData.map((d, i) => {
           const isActive = i === safeActiveIndex;
+          const dotColor = d.trend ? TREND_COLORS[d.trend] : '#FF8A00';
           return (
             <div
               key={i}
               onClick={() => setActiveIndex(i)}
               className={`absolute transform -translate-x-1/2 text-[9px] text-center font-bold cursor-pointer transition-colors px-1.5 py-1 rounded-md whitespace-nowrap
-                ${isActive ? 'text-[#FF8A00] bg-[#FF8A00]/10' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
-              style={{ left: `${getX(i)}%`, top: 0 }}
+                ${isActive ? '' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
+              style={{ left: `${getX(i)}%`, top: 0, ...(isActive ? { color: dotColor, backgroundColor: `${dotColor}1A` } : {}) }}
             >
               {d.shortDate}
             </div>
@@ -398,6 +427,8 @@ export default function App() {
   };
 
   const latestSession = sessions[0] || null;
+  // "אימון ההשוואה" - האימון שלפני האחרון, משמש לבדיקת "שבירת שיא" (המגרש, כרטיס הסטטיסטיקה, חלוקה לאזורים)
+  const comparisonSession = sessions.length > 1 ? sessions[1] : null;
   // כשיוצרים אימון חדש, האימון "הקודם" הוא פשוט האימון האחרון שכבר נשמר (sessions[0]) -
   // הוא עדיין לא כלול במערך sessions באותה נקודה. בעריכת אימון קיים, "הקודם" הוא האימון
   // האחרון שאינו זה שנערך כרגע.
@@ -407,14 +438,19 @@ export default function App() {
     ? (sessions.find(s => s.id === editingId)?.targetShots || settings.targetShots)
     : settings.targetShots;
 
-  const latestSessionPerc = useMemo(() => {
-    if (!latestSession) return 0;
-    const values = Object.values(latestSession.data);
-    const total = values.length * latestSession.targetShots;
-    if (total === 0) return 0;
+  const sessionOverallPerc = (session) => {
+    if (!session) return null;
+    const values = Object.values(session.data);
+    const total = values.length * session.targetShots;
+    if (total === 0) return null;
     const made = values.reduce((a, b) => a + b, 0);
     return Math.round((made / total) * 100);
-  }, [latestSession]);
+  };
+
+  const latestSessionPerc = useMemo(() => sessionOverallPerc(latestSession) ?? 0, [latestSession]);
+  const comparisonSessionPerc = useMemo(() => sessionOverallPerc(comparisonSession), [comparisonSession]);
+  const overallTrend = getTrend(latestSessionPerc, comparisonSessionPerc);
+  const overallTrendColor = overallTrend ? TREND_COLORS[overallTrend] : '#FF8A00';
 
   const stats = useMemo(() => {
     if (!sessions.length) return null;
@@ -424,11 +460,13 @@ export default function App() {
     const zoneData = {};
     GROUP_ORDER.forEach(g => zoneData[g] = {
       allTimeMade: 0, allTimeAttempts: 0,
-      lastMade: 0, lastAttempts: 0
+      lastMade: 0, lastAttempts: 0,
+      prevMade: 0, prevAttempts: 0
     });
 
     sessions.forEach((session, idx) => {
       const isLast = idx === 0;
+      const isPrev = idx === 1;
       Object.entries(session.data).forEach(([idStr, made]) => {
         const spot = SPOTS.find(s => s.id === parseInt(idStr, 10));
         if (spot) {
@@ -442,6 +480,10 @@ export default function App() {
             lastShots += session.targetShots;
             zoneData[spot.group].lastMade += made;
             zoneData[spot.group].lastAttempts += session.targetShots;
+          }
+          if (isPrev) {
+            zoneData[spot.group].prevMade += made;
+            zoneData[spot.group].prevAttempts += session.targetShots;
           }
         }
       });
@@ -459,7 +501,7 @@ export default function App() {
   }, [sessions]);
 
   const graphData = useMemo(() => {
-    return sessions.map(session => {
+    const raw = sessions.map(session => {
       let made = 0, total = 0;
 
       if (filterMode === 'overall') {
@@ -488,8 +530,50 @@ export default function App() {
         percentage: total > 0 ? (made / total) * 100 : 0,
         hasData: total > 0
       };
-    }).filter(d => d.hasData);
+    });
+    // raw הוא מהחדש לישן (כמו sessions). אחרי הסינון, כל נקודה מושווית לנקודה שאחריה במערך (=הישנה ממנה, לצורך "שבירת שיא")
+    const filtered = raw.filter(d => d.hasData);
+    return filtered.map((d, i) => {
+      const older = filtered[i + 1];
+      return { ...d, trend: older ? getTrend(d.percentage, older.percentage) : null };
+    });
   }, [sessions, filterMode, filterZone, filterSpot]);
+
+  const insights = useMemo(() => {
+    if (!latestSession || !stats) return [];
+    const list = [];
+
+    if (comparisonSession && comparisonSessionPerc !== null) {
+      const diff = latestSessionPerc - comparisonSessionPerc;
+      if (diff > 0) list.push({ type: 'up', text: `השתפרת ב-${diff} נקודות אחוז לעומת האימון הקודם. כל הכבוד!` });
+      else if (diff < 0) list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)} נקודות אחוז לעומת האימון הקודם - זה קורה, תמשיך להתאמן.` });
+      else list.push({ type: 'same', text: 'נשארת בדיוק על אותו אחוז כמו באימון הקודם.' });
+
+      let bestZone = null, bestDelta = 0;
+      GROUP_ORDER.forEach(g => {
+        const zd = stats.zoneData[g];
+        if (zd.lastAttempts > 0 && zd.prevAttempts > 0) {
+          const delta = Math.round((zd.lastMade / zd.lastAttempts) * 100) - Math.round((zd.prevMade / zd.prevAttempts) * 100);
+          if (delta > bestDelta) { bestDelta = delta; bestZone = g; }
+        }
+      });
+      if (bestZone) list.push({ type: 'up', text: `האזור עם השיפור הגדול ביותר: "${bestZone}" (+${bestDelta}%)` });
+    } else {
+      list.push({ type: 'same', text: 'זהו האימון הראשון שלך שנשמר - מכאן והלאה תוכל לעקוב אחרי ההתקדמות שלך!' });
+    }
+
+    let weakZone = null, weakPerc = Infinity;
+    GROUP_ORDER.forEach(g => {
+      const zd = stats.zoneData[g];
+      if (zd.lastAttempts > 0) {
+        const lp = Math.round((zd.lastMade / zd.lastAttempts) * 100);
+        if (lp < weakPerc) { weakPerc = lp; weakZone = g; }
+      }
+    });
+    if (weakZone) list.push({ type: 'down', text: `הכי כדאי להתמקד באזור "${weakZone}" (${weakPerc}%) באימון הבא.` });
+
+    return list;
+  }, [latestSession, comparisonSession, comparisonSessionPerc, latestSessionPerc, stats]);
 
   const filterModeOptions = [
     { value: 'overall', label: 'ממוצע כולל (סה"כ)' },
@@ -587,18 +671,34 @@ export default function App() {
                     value={settings.targetShots}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (raw === '') { setSettings({ targetShots: '' }); return; }
+                      if (raw === '') { setSettings(prev => ({ ...prev, targetShots: '' })); return; }
                       const v = parseInt(raw, 10);
-                      if (Number.isFinite(v) && v >= 1) setSettings({ targetShots: v });
+                      if (Number.isFinite(v) && v >= 1) setSettings(prev => ({ ...prev, targetShots: v }));
                     }}
                     onBlur={() => {
                       if (!Number.isFinite(settings.targetShots) || settings.targetShots < 1) {
-                        setSettings({ targetShots: 10 });
+                        setSettings(prev => ({ ...prev, targetShots: 10 }));
                       }
                     }}
                     className="w-20 bg-transparent text-center text-3xl font-black text-[#FF8A00] outline-none"
                   />
                   <span className="text-[#848B98] text-xs leading-relaxed">זריקות (ישפיע רק על<br/>אימונים חדשים שתפתח)</span>
+                </div>
+              </div>
+
+              <div className="border-t border-[#2A2F3D] pt-6 mb-6">
+                <div className="flex items-center justify-between bg-[#0F1115] p-4 rounded-2xl border border-[#2A2F3D]">
+                  <div>
+                    <p className="text-white font-bold text-sm">הצגת מסקנות</p>
+                    <p className="text-[#848B98] text-[10px] mt-0.5">כרטיס תובנות ומוטיבציה בעמוד הסטטיסטיקות</p>
+                  </div>
+                  <button
+                    onClick={() => setSettings(prev => ({ ...prev, showInsights: prev.showInsights === false }))}
+                    aria-label="הצג או הסתר מסקנות"
+                    className={`relative w-12 h-7 rounded-full transition-colors shrink-0 ${settings.showInsights === false ? 'bg-[#3A4155]' : 'bg-[#FF8A00]'}`}
+                  >
+                    <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-all ${settings.showInsights === false ? 'right-1' : 'right-6'}`}></span>
+                  </button>
                 </div>
               </div>
 
@@ -633,8 +733,11 @@ export default function App() {
                   {latestSession ? new Date(latestSession.date).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'numeric' }) : 'אין נתונים'}
                 </p>
               </div>
-              <div className="text-left bg-gradient-to-br from-[#FF8A00]/20 to-[#FF8A00]/5 px-4 py-2 rounded-xl border border-[#FF8A00]/20">
-                <p className="text-[#FF8A00] text-xl font-black">{latestSessionPerc}%</p>
+              <div
+                className="text-left px-4 py-2 rounded-xl border"
+                style={{ background: `linear-gradient(to bottom right, ${overallTrendColor}33, ${overallTrendColor}0D)`, borderColor: `${overallTrendColor}33` }}
+              >
+                <p className="text-xl font-black" style={{ color: overallTrendColor }}>{latestSessionPerc}%</p>
               </div>
             </div>
 
@@ -664,6 +767,8 @@ export default function App() {
               {SPOTS.map((spot) => {
                 const score = latestSession?.data[spot.id];
                 if (score === undefined) return null;
+                const trend = getTrend(score, comparisonSession?.data[spot.id]);
+                const trendColor = trend ? TREND_COLORS[trend] : '#FFFFFF';
                 return (
                   <button
                     key={spot.id}
@@ -673,9 +778,10 @@ export default function App() {
                     style={{ left: `${spot.x}%`, top: `${(spot.y / 125) * 100}%`, pointerEvents: 'auto' }}
                   >
                     <span
-                      className="text-white font-black text-[18px]"
+                      className="font-black text-[18px]"
                       style={{
-                        textShadow: '0px 2px 4px rgba(0,0,0,1), 0px 0px 8px rgba(0,0,0,0.8)',
+                        color: trendColor,
+                        textShadow: `0px 2px 4px rgba(0,0,0,1), 0px 0px 10px ${trendColor}CC`,
                         fontFamily: 'Impact, sans-serif'
                       }}
                     >
@@ -694,6 +800,13 @@ export default function App() {
               <p className="text-[#848B98] text-[10px] mt-1.5 flex items-center justify-center gap-1">
                 <Target size={12} /> לחץ על כל מספר במגרש כדי לראות סטטיסטיקה
               </p>
+              {comparisonSession && (
+                <div className="flex items-center justify-center gap-3 mt-2 text-[9px] text-[#848B98]">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.up }}></span>שיא חדש</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.same }}></span>ללא שינוי</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.down }}></span>ירידה</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -777,12 +890,40 @@ export default function App() {
                 </div>
                 <div className="flex justify-between items-end relative z-10">
                   <div>
-                    <p className="text-4xl font-black text-white leading-none">{stats.lastPerc}<span className="text-[#FF8A00] text-xl">%</span></p>
+                    <p className="text-4xl font-black leading-none" style={{ color: overallTrendColor }}>{stats.lastPerc}<span className="text-xl">%</span></p>
+                    {overallTrend && (
+                      <p className="text-[10px] font-bold mt-1 flex items-center gap-1" style={{ color: overallTrendColor }}>
+                        {overallTrend === 'up' && <><ArrowUp size={11} /> שיא חדש!</>}
+                        {overallTrend === 'down' && <><ArrowDown size={11} /> ירידה מהאימון הקודם</>}
+                        {overallTrend === 'same' && <><Minus size={11} /> ללא שינוי</>}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p dir="ltr" className="text-[#E0E2E7] font-bold">{stats.lastMade} / {stats.lastShots}</p>
                     <p className="text-[#848B98] text-[10px]">קליעות מהאימון האחרון</p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* מסקנות ותובנות */}
+            {settings.showInsights !== false && insights.length > 0 && (
+              <div className="bg-[#1C202A] rounded-2xl p-5 border border-[#2A2F3D] shadow-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-5 h-5 text-[#FF8A00]" />
+                  <h3 className="text-white font-bold text-sm">מסקנות מהאימון</h3>
+                </div>
+                <div className="space-y-2.5">
+                  {insights.map((insight, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <span
+                        className="shrink-0 mt-1 w-2 h-2 rounded-full"
+                        style={{ backgroundColor: TREND_COLORS[insight.type] }}
+                      ></span>
+                      <p className="text-[#E0E2E7] text-xs leading-relaxed">{insight.text}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
@@ -855,6 +996,9 @@ export default function App() {
                   if (data.allTimeAttempts === 0) return null;
 
                   const lastPerc = data.lastAttempts > 0 ? Math.round((data.lastMade / data.lastAttempts) * 100) : 0;
+                  const prevPerc = data.prevAttempts > 0 ? Math.round((data.prevMade / data.prevAttempts) * 100) : null;
+                  const zoneTrend = comparisonSession ? getTrend(lastPerc, prevPerc) : null;
+                  const zoneTrendColor = zoneTrend ? TREND_COLORS[zoneTrend] : '#FF8A00';
                   const allPerc = Math.round((data.allTimeMade / data.allTimeAttempts) * 100);
 
                   return (
@@ -864,14 +1008,14 @@ export default function App() {
                       {/* פס אימון אחרון */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-20">
-                          <p className="text-[9px] text-[#FF8A00] font-bold uppercase">אימון אחרון</p>
+                          <p className="text-[9px] font-bold uppercase" style={{ color: zoneTrendColor }}>אימון אחרון</p>
                           <p dir="ltr" className="text-[11px] text-[#A0A6B1]">{data.lastMade}/{data.lastAttempts}</p>
                         </div>
                         <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
-                          <div className="h-full bg-[#FF8A00] rounded-full" style={{ width: `${lastPerc}%` }} />
+                          <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
                         </div>
                         <div className="w-8 text-right">
-                          <span className="font-black text-white text-xs">{lastPerc}%</span>
+                          <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
                         </div>
                       </div>
 
