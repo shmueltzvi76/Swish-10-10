@@ -474,7 +474,7 @@ export default function App() {
 
 
   return (
-    <div className="min-h-screen bg-[#0F1115] text-[#E0E2E7] font-sans pb-24 selection:bg-[#FF8A00]/30" dir="rtl">
+    <div className="h-dvh flex flex-col overflow-hidden bg-[#0F1115] text-[#E0E2E7] font-sans selection:bg-[#FF8A00]/30" dir="rtl">
 
       {/* ===================== מודל פרטי נקודה ===================== */}
       {selectedSpotDetails && (
@@ -519,7 +519,7 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="bg-[#161920] border-b border-[#252A36] pt-8 pb-4 px-5 sticky top-0 z-30 shadow-md">
+      <header className="shrink-0 bg-[#161920] border-b border-[#252A36] pt-8 pb-4 px-5 shadow-md">
         <div className="flex justify-between items-center max-w-md mx-auto">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-[#FF8A00] to-[#E55D00] rounded-xl flex items-center justify-center shadow-lg shadow-[#FF8A00]/20">
@@ -540,11 +540,11 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-md mx-auto relative">
+      <main className="flex-1 min-h-0 overflow-y-auto w-full max-w-md mx-auto relative">
 
         {/* מודל הגדרות */}
         {showSettingsModal && (
-          <div className="absolute inset-0 z-40 bg-[#0F1115]/95 backdrop-blur-sm p-6 animate-in fade-in">
+          <div className="fixed inset-0 z-40 bg-[#0F1115]/95 backdrop-blur-sm p-6 overflow-y-auto animate-in fade-in">
             <div className="bg-[#1C202A] rounded-3xl p-6 border border-[#2A2F3D] shadow-2xl mt-10">
               <h2 className="text-xl font-bold text-white mb-6">הגדרות אימון</h2>
 
@@ -724,7 +724,7 @@ export default function App() {
 
             <button
               onClick={saveSession}
-              className="w-full mt-8 bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115] font-black text-lg py-4 rounded-xl shadow-lg shadow-[#FF8A00]/20 active:scale-95 transition-all sticky bottom-24"
+              className="w-full mt-8 bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115] font-black text-lg py-4 rounded-xl shadow-lg shadow-[#FF8A00]/20 active:scale-95 transition-all sticky bottom-0"
             >
               {editingId ? 'עדכן אימון' : 'שמור אימון'}
             </button>
@@ -905,7 +905,7 @@ export default function App() {
       </main>
 
       {/* תפריט תחתון */}
-      <nav className="fixed bottom-0 w-full bg-[#161920]/95 backdrop-blur-md border-t border-[#2A2F3D] pb-safe z-30 shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
+      <nav className="shrink-0 w-full bg-[#161920]/95 backdrop-blur-md border-t border-[#2A2F3D] pb-safe shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
         <div className="max-w-md mx-auto flex justify-around p-2">
           <button onClick={() => {setActiveTab('court'); setShowSettingsModal(false);}} className={`flex flex-col items-center gap-1 transition-colors p-2 ${activeTab === 'court' && !showSettingsModal ? 'text-[#FF8A00]' : 'text-[#848B98]'}`}>
             <Target size={22} />
