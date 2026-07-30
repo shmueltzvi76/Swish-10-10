@@ -44,7 +44,7 @@ const STORAGE_SETTINGS_KEY = 'swish_pro_settings_v19';
 
 const INITIAL_SESSION = {
   id: 1715000000000,
-  date: new Date().toISOString(),
+  date: '2026-07-29T19:50:03.000Z', // יום רביעי, 22:50:03 בשעון ישראל (UTC+3)
   targetShots: 10,
   data: {
     1: 1, 2: 4, 3: 1, 4: 3, 5: 5,
@@ -293,7 +293,16 @@ export default function App() {
     }
 
     if (parsedSessions) {
-      setSessions(parsedSessions);
+      // מתקן רטרואקטיבית תאריך שגוי שנשמר בעבר עבור אימון הדוגמה המובנה (מזוהה לפי ה-id הקבוע שלו)
+      const fixedSessions = parsedSessions.map(s =>
+        s.id === INITIAL_SESSION.id && s.date !== INITIAL_SESSION.date
+          ? { ...s, date: INITIAL_SESSION.date }
+          : s
+      );
+      setSessions(fixedSessions);
+      if (JSON.stringify(fixedSessions) !== JSON.stringify(parsedSessions)) {
+        localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(fixedSessions));
+      }
     } else {
       setSessions([INITIAL_SESSION]);
       localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify([INITIAL_SESSION]));
@@ -518,7 +527,7 @@ export default function App() {
                  {selectedSpotDetails.s1 ? (
                     <div className="flex justify-between items-end">
                        <span className="text-4xl font-black text-white">{selectedSpotDetails.s1.perc}<span className="text-2xl text-[#FF8A00]">%</span></span>
-                       <span dir="ltr" className="text-[#A0A6B1] text-sm font-medium mb-1">({selectedSpotDetails.s1.made}/{selectedSpotDetails.s1.target})</span>
+                       <span dir="ltr" className="text-[#A0A6B1] text-sm font-medium mb-1">{selectedSpotDetails.s1.made}/{selectedSpotDetails.s1.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">לא נזרק באימון זה</p>}
               </div>
@@ -528,7 +537,7 @@ export default function App() {
                  {selectedSpotDetails.s2 ? (
                     <div className="flex justify-between items-end">
                        <span className="text-3xl font-bold text-white">{selectedSpotDetails.s2.perc}%</span>
-                       <span dir="ltr" className="text-[#848B98] text-sm mb-1">({selectedSpotDetails.s2.made}/{selectedSpotDetails.s2.target})</span>
+                       <span dir="ltr" className="text-[#848B98] text-sm mb-1">{selectedSpotDetails.s2.made}/{selectedSpotDetails.s2.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">אין נתונים מהאימון הקודם</p>}
               </div>
