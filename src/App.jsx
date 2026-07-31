@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, List, ListOrdered, Highlighter, ArrowRight, FileText } from 'lucide-react';
 
-const TREND_COLORS = { up: '#3E9C6E', down: '#C4534A', same: '#FF8A00' };
+const TREND_COLORS = { up: '#FFC94D', down: '#C4534A', same: '#FF8A00' };
 
 // משווה בין ציון נוכחי לציון קודם ומחזיר 'up' (שיא נשבר) / 'down' / 'same' / null (אין נתון להשוואה)
 const getTrend = (current, previous) => {
@@ -223,6 +223,12 @@ const SmartLineChart = ({ data }) => {
 
   const svgPoints = chartData.map((d, i) => `${getX(i)},${getSvgY(d.percentage)}`).join(' ');
 
+  // צבע אחיד לכל הגרף, לפי המגמה בין שתי הנקודות האחרונות (הכי עדכני) - הצורה של הגרף עצמו מראה עלייה/ירידה לאורך הזמן
+  const latestPoint = chartData[chartData.length - 1];
+  const priorPoint = chartData[chartData.length - 2];
+  const graphTrend = priorPoint ? getTrend(latestPoint.percentage, priorPoint.percentage) : null;
+  const graphColor = graphTrend ? TREND_COLORS[graphTrend] : '#FF8A00';
+
   return (
     <div className="w-full relative pt-2 pb-6">
 
@@ -231,8 +237,8 @@ const SmartLineChart = ({ data }) => {
           <p className="text-[#848B98] text-[10px] uppercase tracking-wider mb-0.5">{activeData.fullDate}</p>
           <p className="text-white font-bold text-xs">תוצאת אימון נבחר</p>
         </div>
-        <div className="text-2xl font-black text-[#FF8A00] drop-shadow-md">
-          {activeData.percentage.toFixed(0)}<span className="text-sm text-[#FF8A00]">%</span>
+        <div className="text-2xl font-black drop-shadow-md" style={{ color: graphColor }}>
+          {activeData.percentage.toFixed(0)}<span className="text-sm">%</span>
         </div>
       </div>
 
@@ -246,14 +252,14 @@ const SmartLineChart = ({ data }) => {
         <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full overflow-visible" preserveAspectRatio="none">
           {chartData.length > 1 && (
             <>
-              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#orange-grad)" opacity="0.15"/>
-              <polyline points={svgPoints} fill="none" stroke="#FF8A00" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <polygon points={`0,100 ${svgPoints} ${getX(chartData.length-1)},100`} fill="url(#trend-grad)" opacity="0.15"/>
+              <polyline points={svgPoints} fill="none" stroke={graphColor} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             </>
           )}
           <defs>
-            <linearGradient id="orange-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF8A00" stopOpacity="1" />
-              <stop offset="100%" stopColor="#FF8A00" stopOpacity="0" />
+            <linearGradient id="trend-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={graphColor} stopOpacity="1" />
+              <stop offset="100%" stopColor={graphColor} stopOpacity="0" />
             </linearGradient>
           </defs>
         </svg>
@@ -269,12 +275,17 @@ const SmartLineChart = ({ data }) => {
               onClick={() => setActiveIndex(i)}
             >
               {isActive && (
-                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed border-[#FF8A00]/50" style={{ left: '50%' }}></div>
+                <div className="absolute top-0 bottom-0 w-[1px] bg-transparent border-r border-dashed" style={{ left: '50%', borderColor: `${graphColor}80` }}></div>
               )}
               <div
                 className={`absolute rounded-full transform -translate-x-1/2 translate-y-1/2 transition-all duration-300
-                  ${isActive ? 'w-4 h-4 bg-[#FF8A00] border-[3px] border-[#1C202A] shadow-[0_0_12px_rgba(255,138,0,0.8)] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px] border-[#FF8A00]'}`}
-                style={{ left: '50%', bottom: `${d.percentage}%` }}
+                  ${isActive ? 'w-4 h-4 border-[3px] border-[#1C202A] z-30' : 'w-2 h-2 bg-[#0F1115] border-[2px]'}`}
+                style={{
+                  left: '50%', bottom: `${d.percentage}%`,
+                  backgroundColor: isActive ? graphColor : '#0F1115',
+                  borderColor: graphColor,
+                  boxShadow: isActive ? `0 0 12px ${graphColor}CC` : 'none'
+                }}
               ></div>
             </div>
           );
@@ -289,8 +300,8 @@ const SmartLineChart = ({ data }) => {
               key={i}
               onClick={() => setActiveIndex(i)}
               className={`absolute transform -translate-x-1/2 text-[9px] text-center font-bold cursor-pointer transition-colors px-1.5 py-1 rounded-md whitespace-nowrap
-                ${isActive ? 'text-[#FF8A00] bg-[#FF8A00]/10' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
-              style={{ left: `${getX(i)}%`, top: 0 }}
+                ${isActive ? '' : 'text-[#848B98] hover:text-[#E0E2E7]'}`}
+              style={{ left: `${getX(i)}%`, top: 0, ...(isActive ? { color: graphColor, backgroundColor: `${graphColor}1A` } : {}) }}
             >
               {d.shortDate}
             </div>
@@ -469,10 +480,13 @@ export default function App() {
       };
     };
 
+    const s1 = getStats(session1);
+    const s2 = getStats(session2);
+
     setSelectedSpotDetails({
       name: spot.name,
-      s1: getStats(session1),
-      s2: getStats(session2)
+      s1: s1 ? { ...s1, trend: s2 ? getTrend(s1.perc, s2.perc) : null } : null,
+      s2
     });
   };
 
@@ -687,7 +701,7 @@ export default function App() {
                  <p className="text-[#FF8A00] text-xs font-bold uppercase tracking-wider mb-2">אימון אחרון</p>
                  {selectedSpotDetails.s1 ? (
                     <div className="flex justify-between items-end">
-                       <span className="text-4xl font-black text-white">{selectedSpotDetails.s1.perc}<span className="text-2xl text-[#FF8A00]">%</span></span>
+                       <span className="text-4xl font-black" style={{ color: selectedSpotDetails.s1.trend ? TREND_COLORS[selectedSpotDetails.s1.trend] : '#FFFFFF' }}>{selectedSpotDetails.s1.perc}%</span>
                        <span dir="ltr" className="text-[#A0A6B1] text-sm font-medium mb-1">{selectedSpotDetails.s1.made}/{selectedSpotDetails.s1.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">לא נזרק באימון זה</p>}
@@ -815,9 +829,9 @@ export default function App() {
         {/* מגרש ראשי */}
         {activeTab === 'court' && !showSettingsModal && (
           <div className="h-full flex flex-col p-4 animate-in fade-in">
-            <div className="shrink-0 bg-[#1C202A] p-4 rounded-2xl mb-5 border border-[#2A2F3D] flex justify-between items-center shadow-lg">
+            <div className="shrink-0 bg-[#1C202A] p-3 rounded-2xl mb-3 border border-[#2A2F3D] flex justify-between items-center shadow-lg">
               <div>
-                <p className="text-[#848B98] text-[10px] font-bold uppercase tracking-wider mb-1">
+                <p className="text-[#848B98] text-[10px] font-bold uppercase tracking-wider mb-0.5">
                   האימון האחרון
                 </p>
                 <p className="text-white font-medium text-sm">
@@ -825,7 +839,7 @@ export default function App() {
                 </p>
               </div>
               <div
-                className="text-left px-4 py-2 rounded-xl border"
+                className="text-left px-3 py-1.5 rounded-xl border"
                 style={{ background: `linear-gradient(to bottom right, ${overallTrendColor}33, ${overallTrendColor}0D)`, borderColor: `${overallTrendColor}33` }}
               >
                 <p className="text-xl font-black" style={{ color: overallTrendColor }}>{latestSessionPerc}%</p>
@@ -884,15 +898,12 @@ export default function App() {
             </div>
             </div>
 
-            <div className="shrink-0 text-center mt-5 bg-[#1C202A] p-3 rounded-xl border border-[#2A2F3D]">
-              <p className="text-[#E0E2E7] text-[11px] font-medium leading-relaxed">
-                מוצגות קליעות מהאימון האחרון מתוך <span className="text-[#FF8A00] font-bold">{latestSession?.targetShots || settings.targetShots} זריקות</span>.
-              </p>
-              <p className="text-[#848B98] text-[10px] mt-1.5 flex items-center justify-center gap-1">
-                <Target size={12} /> לחץ על כל מספר במגרש כדי לראות סטטיסטיקה
+            <div className="shrink-0 text-center mt-3 bg-[#1C202A] px-3 py-2 rounded-xl border border-[#2A2F3D]">
+              <p className="text-[#848B98] text-[10px] flex items-center justify-center gap-1">
+                <Target size={11} /> מתוך <span className="text-[#FF8A00] font-bold">{latestSession?.targetShots || settings.targetShots}</span> זריקות · לחץ על מספר לפרטים
               </p>
               {comparisonSession && (
-                <div className="flex items-center justify-center gap-3 mt-2 text-[9px] text-[#848B98]">
+                <div className="flex items-center justify-center gap-3 mt-1 text-[9px] text-[#848B98]">
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.up }}></span>שיא חדש</span>
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.same }}></span>ללא שינוי</span>
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.down }}></span>ירידה</span>
@@ -1229,6 +1240,9 @@ export default function App() {
                       const sTotal = Object.keys(session.data).length * session.targetShots;
                       Object.values(session.data).forEach(v => sMade += v);
                       const sPerc = sTotal > 0 ? Math.round((sMade / sTotal) * 100) : 0;
+                      const sOlderPerc = sessionOverallPerc(sessions[idx + 1]);
+                      const sTrend = getTrend(sPerc, sOlderPerc);
+                      const sTrendColor = sTrend ? TREND_COLORS[sTrend] : '#FF8A00';
                       const noted = hasNotes(session);
                       return (
                         <button
@@ -1246,7 +1260,7 @@ export default function App() {
                               <p className="text-[10px] mt-0.5" style={{ color: noted ? '#FF8A00' : '#596070' }}>{noted ? 'יש הערות' : 'אין הערות עדיין'}</p>
                             </div>
                           </div>
-                          <span className="text-lg font-black text-[#FF8A00]">{sPerc}%</span>
+                          <span className="text-lg font-black" style={{ color: sTrendColor }}>{sPerc}%</span>
                         </button>
                       );
                     })}
@@ -1260,6 +1274,10 @@ export default function App() {
           const jTotal = Object.keys(journalSession.data).length * journalSession.targetShots;
           Object.values(journalSession.data).forEach(v => jMade += v);
           const jPerc = jTotal > 0 ? Math.round((jMade / jTotal) * 100) : 0;
+          const jIdx = sessions.findIndex(s => s.id === journalSession.id);
+          const jOlderPerc = sessionOverallPerc(sessions[jIdx + 1]);
+          const jTrend = getTrend(jPerc, jOlderPerc);
+          const jTrendColor = jTrend ? TREND_COLORS[jTrend] : '#FF8A00';
 
           return (
             <div className="p-4 animate-in slide-in-from-bottom-4 pb-10">
@@ -1272,7 +1290,7 @@ export default function App() {
                   <p className="text-white font-bold text-sm">{new Date(journalSession.date).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'numeric' })}</p>
                   <p className="text-[10px] text-[#848B98] mt-0.5" dir="ltr">{jMade}/{jTotal} קליעות</p>
                 </div>
-                <span className="text-xl font-black text-[#FF8A00]">{jPerc}%</span>
+                <span className="text-xl font-black" style={{ color: jTrendColor }}>{jPerc}%</span>
               </div>
 
               <div className="mb-6">
