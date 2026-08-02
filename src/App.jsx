@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, Italic, Underline, List, ListOrdered, Highlighter, Palette, ArrowRight, FileText } from 'lucide-react';
 
-const TREND_COLORS = { up: '#5FAE52', down: '#C4534A', same: '#FF8A00' };
+const TREND_COLORS = { up: '#22C55E', down: '#EF4444', same: '#FF8A00' };
 
 // משווה בין ציון נוכחי לציון קודם ומחזיר 'up' (שיא נשבר) / 'down' / 'same' / null (אין נתון להשוואה)
 const getTrend = (current, previous) => {
@@ -163,15 +163,15 @@ const HybridInput = ({ value, onChange, max }) => {
 const TEXT_COLOR_SWATCHES = [
   { label: 'ברירת מחדל', value: '#E0E2E7' },
   { label: 'כתום', value: '#FF8A00' },
-  { label: 'ירוק', value: '#5FAE52' },
-  { label: 'אדום', value: '#C4534A' },
+  { label: 'ירוק', value: '#22C55E' },
+  { label: 'אדום', value: '#EF4444' },
 ];
 
 const HIGHLIGHT_SWATCHES = [
   { label: 'ללא הדגשה', value: 'transparent' },
-  { label: 'כתום', value: 'rgba(255,138,0,0.28)' },
-  { label: 'ירוק', value: 'rgba(95,174,82,0.28)' },
-  { label: 'אדום', value: 'rgba(196,83,74,0.28)' },
+  { label: 'כתום', value: 'rgba(255,138,0,0.45)' },
+  { label: 'ירוק', value: 'rgba(34,197,94,0.45)' },
+  { label: 'אדום', value: 'rgba(239,68,68,0.45)' },
 ];
 
 const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
@@ -230,6 +230,25 @@ const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
         <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenPopover(p => p === 'highlight' ? null : 'highlight')} className={btnClass(openPopover === 'highlight')} aria-label="הדגשת רקע">
           <Highlighter size={14} />
         </button>
+        <div className="w-px h-5 bg-[#3A4155] mx-1 shrink-0"></div>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            if (!ref.current || !ref.current.textContent.trim()) return;
+            if (!window.confirm('למחוק את כל הטקסט בהערה הזו?')) return;
+            ref.current.focus();
+            document.execCommand('selectAll');
+            document.execCommand('delete');
+            onChange(ref.current.innerHTML);
+            syncActiveFormats();
+          }}
+          className="p-2 rounded-lg hover:bg-[#C4534A]/15 text-[#C4534A] transition-colors"
+          aria-label="מחיקת כל הטקסט"
+          title="מחיקת כל הטקסט"
+        >
+          <Trash2 size={14} />
+        </button>
 
         {openPopover && (
           <>
@@ -273,7 +292,7 @@ const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
         onMouseUp={syncActiveFormats}
         onFocus={syncActiveFormats}
         data-placeholder={placeholder}
-        className="journal-content p-3 min-h-[90px] max-h-[50vh] overflow-y-auto text-sm text-[#E0E2E7] leading-relaxed outline-none"
+        className="journal-content p-3 min-h-[90px] max-h-[50vh] overflow-y-auto text-sm text-[#E0E2E7] leading-relaxed outline-none bg-[#171B24]"
         style={{ direction: 'rtl' }}
       />
     </div>
@@ -956,21 +975,21 @@ export default function App() {
                   <button
                     key={spot.id}
                     onClick={() => handleSpotClick(spot.id)}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-9 h-9"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-8 h-8"
                     // המרה ל-125 בגובה
                     style={{ left: `${spot.x}%`, top: `${(spot.y / 125) * 100}%`, pointerEvents: 'auto' }}
                   >
                     <div className="relative w-full h-full flex items-center justify-center">
                       {trend && (
                         <div
-                          className="absolute inset-0 rounded-full"
-                          style={{ backgroundColor: trendColor, opacity: 0.88, boxShadow: `0 0 7px 1px ${trendColor}` }}
+                          className="absolute rounded-full"
+                          style={{ inset: '4px', backgroundColor: trendColor, boxShadow: `0 0 3px 0px ${trendColor}` }}
                         ></div>
                       )}
                       <span
-                        className="relative z-10 font-black text-[18px] text-white"
+                        className="relative z-10 font-black text-[13px] text-white"
                         style={{
-                          textShadow: '0px 2px 4px rgba(0,0,0,0.9), 0px 0px 3px rgba(0,0,0,0.9)',
+                          textShadow: '0px 1px 3px rgba(0,0,0,0.95), 0px 0px 2px rgba(0,0,0,0.95)',
                           fontFamily: 'Impact, sans-serif'
                         }}
                       >
