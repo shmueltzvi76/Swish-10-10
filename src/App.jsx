@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, Italic, Underline, List, ListOrdered, Highlighter, Palette, ArrowRight, FileText } from 'lucide-react';
 
-const TREND_COLORS = { up: '#7BA05B', down: '#C4534A', same: '#FF8A00' };
+const TREND_COLORS = { up: '#5FAE52', down: '#C4534A', same: '#FF8A00' };
 
 // משווה בין ציון נוכחי לציון קודם ומחזיר 'up' (שיא נשבר) / 'down' / 'same' / null (אין נתון להשוואה)
 const getTrend = (current, previous) => {
@@ -163,64 +163,78 @@ const HybridInput = ({ value, onChange, max }) => {
 const TEXT_COLOR_SWATCHES = [
   { label: 'ברירת מחדל', value: '#E0E2E7' },
   { label: 'כתום', value: '#FF8A00' },
-  { label: 'ירוק', value: '#7BA05B' },
+  { label: 'ירוק', value: '#5FAE52' },
   { label: 'אדום', value: '#C4534A' },
 ];
 
 const HIGHLIGHT_SWATCHES = [
   { label: 'ללא הדגשה', value: 'transparent' },
   { label: 'כתום', value: 'rgba(255,138,0,0.28)' },
-  { label: 'ירוק', value: 'rgba(123,160,91,0.28)' },
+  { label: 'ירוק', value: 'rgba(95,174,82,0.28)' },
   { label: 'אדום', value: 'rgba(196,83,74,0.28)' },
 ];
 
 const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
   const ref = useRef(null);
   const [openPopover, setOpenPopover] = useState(null);
+  const [activeFormats, setActiveFormats] = useState({ bold: false, italic: false, underline: false });
 
   useEffect(() => {
     if (ref.current) ref.current.innerHTML = initialValue || '';
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const syncActiveFormats = () => {
+    try {
+      setActiveFormats({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+      });
+    } catch {
+      // ignore - queryCommandState can throw in rare cases when there's no selection yet
+    }
+  };
+
   const exec = (cmd, arg) => {
     ref.current?.focus();
     document.execCommand(cmd, false, arg);
     onChange(ref.current.innerHTML);
     setOpenPopover(null);
+    syncActiveFormats();
   };
 
-  const btnClass = 'p-2 rounded-lg hover:bg-[#2A2F3D] text-[#E0E2E7] transition-colors';
+  const btnClass = (active) => `p-2 rounded-lg transition-colors ${active ? 'bg-[#FF8A00]/20 text-[#FF8A00]' : 'text-[#E0E2E7] hover:bg-[#2A2F3D]'}`;
 
   return (
     <div className="border border-[#3A4155] rounded-xl overflow-hidden bg-[#0F1115]">
       <div className="relative flex items-center gap-0.5 p-2 border-b border-[#3A4155] bg-[#161920] flex-wrap">
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')} className={btnClass} aria-label="הדגשה">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('bold')} className={btnClass(activeFormats.bold)} aria-label="הדגשה">
           <Bold size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} className={btnClass} aria-label="נטוי">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('italic')} className={btnClass(activeFormats.italic)} aria-label="נטוי">
           <Italic size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} className={btnClass} aria-label="קו תחתון">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('underline')} className={btnClass(activeFormats.underline)} aria-label="קו תחתון">
           <Underline size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertUnorderedList')} className={btnClass} aria-label="רשימת נקודות">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertUnorderedList')} className={btnClass(false)} aria-label="רשימת נקודות">
           <List size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertOrderedList')} className={btnClass} aria-label="רשימה ממוספרת">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('insertOrderedList')} className={btnClass(false)} aria-label="רשימה ממוספרת">
           <ListOrdered size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenPopover(p => p === 'color' ? null : 'color')} className={btnClass} aria-label="צבע טקסט">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenPopover(p => p === 'color' ? null : 'color')} className={btnClass(openPopover === 'color')} aria-label="צבע טקסט">
           <Palette size={14} />
         </button>
-        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenPopover(p => p === 'highlight' ? null : 'highlight')} className={btnClass} aria-label="הדגשת רקע">
+        <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => setOpenPopover(p => p === 'highlight' ? null : 'highlight')} className={btnClass(openPopover === 'highlight')} aria-label="הדגשת רקע">
           <Highlighter size={14} />
         </button>
 
         {openPopover && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpenPopover(null)}></div>
-            <div className="absolute top-full right-0 mt-1 z-50 bg-[#1C202A] border border-[#3A4155] rounded-xl shadow-xl p-2 flex gap-1.5">
+            <div className="absolute top-full right-0 mt-1 z-50 bg-[#1C202A] border border-[#3A4155] rounded-xl shadow-xl p-2 flex gap-2">
               {(openPopover === 'color' ? TEXT_COLOR_SWATCHES : HIGHLIGHT_SWATCHES).map(sw => (
                 <button
                   key={sw.value}
@@ -229,10 +243,21 @@ const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
                   onClick={() => exec(openPopover === 'color' ? 'foreColor' : 'hiliteColor', sw.value)}
                   aria-label={sw.label}
                   title={sw.label}
-                  className="w-7 h-7 rounded-full border border-[#3A4155] flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: sw.value === 'transparent' ? '#0F1115' : sw.value }}
+                  className="flex flex-col items-center gap-1 shrink-0"
                 >
-                  {sw.value === 'transparent' && <X size={12} className="text-[#848B98]" />}
+                  <span
+                    className="w-8 h-8 rounded-full border-2 flex items-center justify-center bg-[#0F1115]"
+                    style={{ borderColor: sw.value === 'transparent' ? '#3A4155' : sw.value }}
+                  >
+                    {sw.value === 'transparent' ? (
+                      <X size={14} className="text-[#848B98]" />
+                    ) : openPopover === 'color' ? (
+                      <span className="text-sm font-black" style={{ color: sw.value }}>א</span>
+                    ) : (
+                      <span className="w-5 h-5 rounded-full" style={{ backgroundColor: sw.value }}></span>
+                    )}
+                  </span>
+                  <span className="text-[8px] text-[#848B98] whitespace-nowrap">{sw.label}</span>
                 </button>
               ))}
             </div>
@@ -244,6 +269,9 @@ const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
         contentEditable
         suppressContentEditableWarning
         onInput={() => onChange(ref.current.innerHTML)}
+        onKeyUp={syncActiveFormats}
+        onMouseUp={syncActiveFormats}
+        onFocus={syncActiveFormats}
         data-placeholder={placeholder}
         className="journal-content p-3 min-h-[90px] max-h-[50vh] overflow-y-auto text-sm text-[#E0E2E7] leading-relaxed outline-none"
         style={{ direction: 'rtl' }}
@@ -897,7 +925,8 @@ export default function App() {
 
             {/* איור מגרש מותאם מתמטית לחלוטין (viewBox: 0 0 100 125), מוקטן לפי הגובה הפנוי כדי שלא יגלוש */}
             <div className="flex-1 min-h-0 flex items-center justify-center">
-            <div className="relative h-full max-w-full aspect-[4/5] bg-[#C28657] rounded-3xl border-[6px] border-white shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="relative h-full max-w-full aspect-[4/5] bg-[#A9713F] rounded-3xl border-[6px] border-white shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+              <div className="absolute inset-0 bg-black/15 pointer-events-none"></div>
               <div className="absolute inset-0 opacity-15 flex flex-col justify-around pointer-events-none">
                 {[...Array(25)].map((_, i) => (
                   <div key={i} className="h-[2px] bg-black/40 w-full shadow-[0_1px_1px_rgba(255,255,255,0.1)]" />
@@ -927,20 +956,27 @@ export default function App() {
                   <button
                     key={spot.id}
                     onClick={() => handleSpotClick(spot.id)}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center justify-center cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-9 h-9"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-9 h-9"
                     // המרה ל-125 בגובה
                     style={{ left: `${spot.x}%`, top: `${(spot.y / 125) * 100}%`, pointerEvents: 'auto' }}
                   >
-                    <span
-                      className="font-black text-[18px]"
-                      style={{
-                        color: trendColor,
-                        textShadow: `0px 2px 4px rgba(0,0,0,1), 0px 0px 10px ${trendColor}CC`,
-                        fontFamily: 'Impact, sans-serif'
-                      }}
-                    >
-                      {score}
-                    </span>
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      {trend && (
+                        <div
+                          className="absolute inset-0 rounded-full"
+                          style={{ backgroundColor: trendColor, opacity: 0.88, boxShadow: `0 0 7px 1px ${trendColor}` }}
+                        ></div>
+                      )}
+                      <span
+                        className="relative z-10 font-black text-[18px] text-white"
+                        style={{
+                          textShadow: '0px 2px 4px rgba(0,0,0,0.9), 0px 0px 3px rgba(0,0,0,0.9)',
+                          fontFamily: 'Impact, sans-serif'
+                        }}
+                      >
+                        {score}
+                      </span>
+                    </div>
                   </button>
                 );
               })}
