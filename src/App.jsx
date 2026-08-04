@@ -1035,7 +1035,7 @@ export default function App() {
                   <button
                     key={spot.id}
                     onClick={() => handleSpotClick(spot.id)}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-6 h-6"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-5 h-5"
                     // המרה ל-125 בגובה
                     style={{ left: `${spot.x}%`, top: `${(spot.y / 125) * 100}%`, pointerEvents: 'auto' }}
                   >
@@ -1043,11 +1043,11 @@ export default function App() {
                       {trend && (
                         <div
                           className="absolute rounded-full"
-                          style={{ inset: '2px', backgroundColor: trendColor, boxShadow: `0 0 2px 0px ${trendColor}` }}
+                          style={{ inset: '1px', backgroundColor: trendColor, boxShadow: `0 0 1px 0px ${trendColor}` }}
                         ></div>
                       )}
                       <span
-                        className="relative z-10 font-black text-[11px] text-white"
+                        className="relative z-10 font-black text-[10px] text-white"
                         style={{
                           textShadow: '0px 1px 2px rgba(0,0,0,0.95), 0px 0px 2px rgba(0,0,0,0.95)',
                           fontFamily: 'Impact, sans-serif'
@@ -1109,7 +1109,6 @@ export default function App() {
                       const val = currentInput[spot.id];
                       const prevScore = previousSession?.data[spot.id];
                       const liveTrend = (val !== undefined && val !== '' && prevScore !== undefined) ? getTrend(val, prevScore) : null;
-                      const liveTrendArrow = liveTrend && liveTrend !== 'same' ? liveTrend : null;
 
                       return (
                         <div key={spot.id} className="flex items-center justify-between p-2">
@@ -1123,7 +1122,7 @@ export default function App() {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <TrendArrow trend={liveTrendArrow} size={16} />
+                            <TrendArrow trend={liveTrend} size={16} />
                             <HybridInput
                               value={val}
                               onChange={(v) => handleInput(spot.id, v)}
