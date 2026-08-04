@@ -613,6 +613,12 @@ export default function App() {
   // הוא עדיין לא כלול במערך sessions באותה נקודה. בעריכת אימון קיים, "הקודם" הוא האימון
   // האחרון שאינו זה שנערך כרגע.
   const previousSession = editingId ? sessions.find(s => s.id !== editingId) : (sessions[0] || null);
+  // האימון שלפני "האימון הקודם" - כדי לתת גם לערך הרפרנס בדף ההזנה צבע/מגמה משלו
+  const priorToPreviousSession = (() => {
+    if (!previousSession) return null;
+    const idx = sessions.findIndex(s => s.id === previousSession.id);
+    return idx >= 0 ? (sessions[idx + 1] || null) : null;
+  })();
 
   const currentTargetShots = editingId
     ? (sessions.find(s => s.id === editingId)?.targetShots || settings.targetShots)
@@ -1109,13 +1115,21 @@ export default function App() {
                       const val = currentInput[spot.id];
                       const prevScore = previousSession?.data[spot.id];
                       const liveTrend = (val !== undefined && val !== '' && prevScore !== undefined) ? getTrend(val, prevScore) : null;
+                      const priorScore = priorToPreviousSession?.data[spot.id];
+                      const prevTrend = prevScore !== undefined && priorScore !== undefined ? getTrend(prevScore, priorScore) : null;
+                      const prevTrendColor = prevTrend ? TREND_COLORS[prevTrend] : '#FF8A00';
 
                       return (
                         <div key={spot.id} className="flex items-center justify-between p-2">
                           <div>
                             <span className="text-[#E0E2E7] font-bold text-sm block">{spot.name}</span>
                             {prevScore !== undefined ? (
-                              <span className="text-[#FF8A00] text-[10px] font-bold">{`אימון קודם: קלעת ${prevScore}`}</span>
+                              <span className="text-[10px] font-bold inline-flex items-center gap-1" style={{ color: prevTrendColor }}>
+                                {`אימון קודם: קלעת ${prevScore}`}
+                                {prevTrend === 'up' && <ArrowUp size={9} strokeWidth={3} />}
+                                {prevTrend === 'down' && <ArrowDown size={9} strokeWidth={3} />}
+                                {prevTrend === 'same' && <span className="w-1 h-1 rounded-full" style={{ backgroundColor: prevTrendColor }}></span>}
+                              </span>
                             ) : (
                               <span className="text-[#596070] text-[10px] font-bold">טרם הוזן בעבר</span>
                             )}
