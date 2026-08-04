@@ -11,6 +11,14 @@ const getTrend = (current, previous) => {
   return 'same';
 };
 
+// אייקון חץ קטן שמלווה צבע מגמה (עלייה/ירידה/ללא שינוי) כדי שהצבע לא יישאר חידה
+const TrendArrow = ({ trend, size = 12, className = '' }) => {
+  if (!trend) return null;
+  const color = TREND_COLORS[trend];
+  const Icon = trend === 'up' ? ArrowUp : trend === 'down' ? ArrowDown : Minus;
+  return <Icon size={size} style={{ color }} className={`inline-block shrink-0 ${className}`} strokeWidth={3} />;
+};
+
 // === מיקומי המגרש המעודכנים מתמטית ברמת הפיקסל! ===
 // מערכת הצירים: 100 רוחב על 125 גובה
 // קו עונשין = Y:55, לוח סל = Y:12
@@ -564,6 +572,7 @@ export default function App() {
     const spot = SPOTS.find(s => s.id === spotId);
     const session1 = sessions[0];
     const session2 = sessions.length > 1 ? sessions[1] : null;
+    const session3 = sessions.length > 2 ? sessions[2] : null;
 
     const getStats = (session) => {
       if (!session || session.data[spotId] === undefined) return null;
@@ -578,11 +587,12 @@ export default function App() {
 
     const s1 = getStats(session1);
     const s2 = getStats(session2);
+    const s3 = getStats(session3);
 
     setSelectedSpotDetails({
       name: spot.name,
       s1: s1 ? { ...s1, trend: s2 ? getTrend(s1.perc, s2.perc) : null } : null,
-      s2
+      s2: s2 ? { ...s2, trend: s3 ? getTrend(s2.perc, s3.perc) : null } : null
     });
   };
 
@@ -756,7 +766,16 @@ export default function App() {
     });
     if (weakZone) {
       const zd = stats.zoneData[weakZone];
-      list.push({ type: 'down', text: `הכי כדאי להתמקד באזור "${weakZone}": קלעת רק ${zd.lastMade}/${zd.lastAttempts} (${weakPerc}%) באימון האחרון, ו-${zd.allTimeMade}/${zd.allTimeAttempts} בסך הכל.` });
+      let weakText = `הכי כדאי להתמקד באזור "${weakZone}": קלעת רק ${zd.lastMade}/${zd.lastAttempts} (${weakPerc}%) באימון האחרון`;
+      if (zd.prevAttempts > 0) {
+        const prevPerc = Math.round((zd.prevMade / zd.prevAttempts) * 100);
+        const delta = weakPerc - prevPerc;
+        if (delta > 0) weakText += `, שיפור של ${delta}% לעומת ${zd.prevMade}/${zd.prevAttempts} (${prevPerc}%) באימון הקודם`;
+        else if (delta < 0) weakText += `, ירידה של ${Math.abs(delta)}% לעומת ${zd.prevMade}/${zd.prevAttempts} (${prevPerc}%) באימון הקודם`;
+        else weakText += `, בדיוק כמו ${zd.prevMade}/${zd.prevAttempts} (${prevPerc}%) באימון הקודם`;
+      }
+      weakText += `, ו-${zd.allTimeMade}/${zd.allTimeAttempts} בסך הכל.`;
+      list.push({ type: 'down', text: weakText });
     }
 
     return list;
@@ -797,7 +816,10 @@ export default function App() {
                  <p className="text-[#848B98] text-xs font-bold uppercase tracking-wider mb-2">אימון אחרון</p>
                  {selectedSpotDetails.s1 ? (
                     <div className="flex justify-between items-end">
-                       <span className="text-4xl font-black" style={{ color: selectedSpotDetails.s1.trend ? TREND_COLORS[selectedSpotDetails.s1.trend] : '#FFFFFF' }}>{selectedSpotDetails.s1.perc}%</span>
+                       <span className="flex items-center gap-1.5 text-4xl font-black" style={{ color: selectedSpotDetails.s1.trend ? TREND_COLORS[selectedSpotDetails.s1.trend] : '#FFFFFF' }}>
+                         {selectedSpotDetails.s1.perc}%
+                         <TrendArrow trend={selectedSpotDetails.s1.trend} size={20} />
+                       </span>
                        <span dir="ltr" className="text-[#A0A6B1] text-sm font-medium mb-1">{selectedSpotDetails.s1.made}/{selectedSpotDetails.s1.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">לא נזרק באימון זה</p>}
@@ -807,7 +829,10 @@ export default function App() {
                  <p className="text-[#848B98] text-xs font-bold uppercase tracking-wider mb-2">אימון קודם</p>
                  {selectedSpotDetails.s2 ? (
                     <div className="flex justify-between items-end">
-                       <span className="text-3xl font-bold text-white">{selectedSpotDetails.s2.perc}%</span>
+                       <span className="flex items-center gap-1.5 text-3xl font-bold" style={{ color: selectedSpotDetails.s2.trend ? TREND_COLORS[selectedSpotDetails.s2.trend] : '#FFFFFF' }}>
+                         {selectedSpotDetails.s2.perc}%
+                         <TrendArrow trend={selectedSpotDetails.s2.trend} size={16} />
+                       </span>
                        <span dir="ltr" className="text-[#848B98] text-sm mb-1">{selectedSpotDetails.s2.made}/{selectedSpotDetails.s2.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">אין נתונים מהאימון הקודם</p>}
@@ -938,7 +963,7 @@ export default function App() {
                 className="text-left px-3 py-1.5 rounded-xl border"
                 style={{ background: `linear-gradient(to bottom right, ${overallTrendColor}33, ${overallTrendColor}0D)`, borderColor: `${overallTrendColor}33` }}
               >
-                <p className="text-xl font-black" style={{ color: overallTrendColor }}>{latestSessionPerc}%</p>
+                <p className="text-xl font-black flex items-center gap-1" style={{ color: overallTrendColor }}>{latestSessionPerc}%<TrendArrow trend={overallTrend} size={14} /></p>
               </div>
             </div>
 
@@ -975,7 +1000,7 @@ export default function App() {
                   <button
                     key={spot.id}
                     onClick={() => handleSpotClick(spot.id)}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-8 h-8"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-transform hover:scale-110 active:scale-95 z-10 w-6 h-6"
                     // המרה ל-125 בגובה
                     style={{ left: `${spot.x}%`, top: `${(spot.y / 125) * 100}%`, pointerEvents: 'auto' }}
                   >
@@ -983,13 +1008,13 @@ export default function App() {
                       {trend && (
                         <div
                           className="absolute rounded-full"
-                          style={{ inset: '4px', backgroundColor: trendColor, boxShadow: `0 0 3px 0px ${trendColor}` }}
+                          style={{ inset: '2px', backgroundColor: trendColor, boxShadow: `0 0 2px 0px ${trendColor}` }}
                         ></div>
                       )}
                       <span
-                        className="relative z-10 font-black text-[13px] text-white"
+                        className="relative z-10 font-black text-[11px] text-white"
                         style={{
-                          textShadow: '0px 1px 3px rgba(0,0,0,0.95), 0px 0px 2px rgba(0,0,0,0.95)',
+                          textShadow: '0px 1px 2px rgba(0,0,0,0.95), 0px 0px 2px rgba(0,0,0,0.95)',
                           fontFamily: 'Impact, sans-serif'
                         }}
                       >
@@ -1048,6 +1073,8 @@ export default function App() {
                     {SPOTS.filter(s => s.group === group).map(spot => {
                       const val = currentInput[spot.id];
                       const prevScore = previousSession?.data[spot.id];
+                      const liveTrend = (val !== undefined && val !== '' && prevScore !== undefined) ? getTrend(val, prevScore) : null;
+                      const liveTrendArrow = liveTrend && liveTrend !== 'same' ? liveTrend : null;
 
                       return (
                         <div key={spot.id} className="flex items-center justify-between p-2">
@@ -1060,11 +1087,14 @@ export default function App() {
                             )}
                           </div>
 
-                          <HybridInput
-                            value={val}
-                            onChange={(v) => handleInput(spot.id, v)}
-                            max={currentTargetShots}
-                          />
+                          <div className="flex items-center gap-2">
+                            <TrendArrow trend={liveTrendArrow} size={16} />
+                            <HybridInput
+                              value={val}
+                              onChange={(v) => handleInput(spot.id, v)}
+                              max={currentTargetShots}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -1237,8 +1267,9 @@ export default function App() {
                                 <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
                                   <div className="h-full rounded-full" style={{ width: `${row.perc}%`, backgroundColor: rowColor }} />
                                 </div>
-                                <div className="w-8 text-right">
+                                <div className="w-14 flex items-center justify-end gap-1">
                                   <span className="font-black text-xs" style={{ color: rowColor }}>{row.perc}%</span>
+                                  <TrendArrow trend={row.trend} size={11} />
                                 </div>
                               </div>
                             );
@@ -1255,8 +1286,9 @@ export default function App() {
                             <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
                               <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
                             </div>
-                            <div className="w-8 text-right">
+                            <div className="w-14 flex items-center justify-end gap-1">
                               <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
+                              <TrendArrow trend={zoneTrend} size={11} />
                             </div>
                           </div>
 
@@ -1303,7 +1335,7 @@ export default function App() {
 
                       <div className="flex items-center gap-4">
                         <div className="text-right mr-2">
-                          <p className="text-lg font-black" style={{ color: sTrendColor }}>{sPerc}%</p>
+                          <p className="text-lg font-black flex items-center gap-1 justify-end" style={{ color: sTrendColor }}>{sPerc}%<TrendArrow trend={sTrend} size={12} /></p>
                           <p className="text-[9px] text-[#848B98]"><span dir="ltr">{sMade}/{sTotal}</span> קליעות</p>
                         </div>
 
@@ -1364,7 +1396,7 @@ export default function App() {
                               <p className="text-[10px] mt-0.5" style={{ color: noted ? '#FF8A00' : '#596070' }}>{noted ? 'יש הערות' : 'אין הערות עדיין'}</p>
                             </div>
                           </div>
-                          <span className="text-lg font-black" style={{ color: sTrendColor }}>{sPerc}%</span>
+                          <span className="text-lg font-black flex items-center gap-1" style={{ color: sTrendColor }}>{sPerc}%<TrendArrow trend={sTrend} size={12} /></span>
                         </button>
                       );
                     })}
@@ -1394,7 +1426,7 @@ export default function App() {
                   <p className="text-white font-bold text-sm">{new Date(journalSession.date).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'numeric' })}</p>
                   <p className="text-[10px] text-[#848B98] mt-0.5" dir="ltr">{jMade}/{jTotal} קליעות</p>
                 </div>
-                <span className="text-xl font-black" style={{ color: jTrendColor }}>{jPerc}%</span>
+                <span className="text-xl font-black flex items-center gap-1" style={{ color: jTrendColor }}>{jPerc}%<TrendArrow trend={jTrend} size={14} /></span>
               </div>
 
               <div className="mb-6">
