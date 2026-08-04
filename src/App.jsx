@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, Italic, Underline, List, ListOrdered, Highlighter, Palette, ArrowRight, FileText } from 'lucide-react';
+import { Target, Plus, TrendingUp, Trophy, Flame, Settings, Trash2, Edit3, ChevronDown, BarChart2, X, Filter, Activity, Sparkles, ArrowUp, ArrowDown, Minus, BookOpen, Bold, Italic, Underline, List, ListOrdered, Highlighter, Palette, ArrowRight, FileText, Download, Upload } from 'lucide-react';
 
 const TREND_COLORS = { up: '#22C55E', down: '#EF4444', same: '#FF8A00' };
 
@@ -59,6 +59,29 @@ const GROUP_ORDER = ['צד שמאל', 'אופקי', 'צד ימין', 'מול ה�
 
 const STORAGE_DATA_KEY = 'swish_pro_data_v19';
 const STORAGE_SETTINGS_KEY = 'swish_pro_settings_v19';
+const STORAGE_ONBOARDED_KEY = 'swish_pro_onboarded_v19';
+
+// נתוני הדגמה בלבד - מוצגים רק כשאין עדיין אימונים אמיתיים, כדי להראות את האפליקציה "בשיא תפארתה".
+// נמחקים אוטומטית ברגע שנשמר אימון אמיתי ראשון, או שהנתונים מנוקים ידנית בהגדרות.
+const DEMO_SESSIONS = [
+  {
+    id: 9004, date: '2026-08-02T18:00:00.000Z', targetShots: 10, isDemo: true,
+    data: { 1: 8, 2: 7, 3: 8, 4: 6, 5: 9, 6: 8, 7: 7, 8: 9, 9: 7, 10: 8, 11: 7, 12: 9, 13: 7, 14: 8, 15: 9, 16: 8, 17: 7, 18: 9, 19: 7, 20: 8, 21: 7 },
+    notes: { general: '<b>אימון מעולה!</b><br>הרגשתי ממש בשליטה היום, במיוחד באזור "מול הסל".', zones: {} }
+  },
+  {
+    id: 9003, date: '2026-07-28T18:00:00.000Z', targetShots: 10, isDemo: true,
+    data: { 1: 5, 2: 4, 3: 5, 4: 3, 5: 6, 6: 5, 7: 4, 8: 6, 9: 4, 10: 5, 11: 4, 12: 6, 13: 4, 14: 5, 15: 6, 16: 5, 17: 4, 18: 6, 19: 4, 20: 5, 21: 4 }
+  },
+  {
+    id: 9002, date: '2026-07-21T18:00:00.000Z', targetShots: 10, isDemo: true,
+    data: { 1: 6, 2: 5, 3: 6, 4: 4, 5: 7, 6: 6, 7: 5, 8: 7, 9: 5, 10: 6, 11: 5, 12: 7, 13: 5, 14: 6, 15: 7, 16: 6, 17: 5, 18: 7, 19: 5, 20: 6, 21: 5 }
+  },
+  {
+    id: 9001, date: '2026-07-14T18:00:00.000Z', targetShots: 10, isDemo: true,
+    data: { 1: 4, 2: 3, 3: 5, 4: 2, 5: 6, 6: 5, 7: 4, 8: 6, 9: 3, 10: 5, 11: 4, 12: 6, 13: 3, 14: 5, 15: 6, 16: 5, 17: 4, 18: 6, 19: 3, 20: 5, 21: 4 }
+  }
+];
 
 const INITIAL_SESSION = {
   id: 1715000000000,
@@ -419,12 +442,14 @@ const SmartLineChart = ({ data }) => {
 
 export default function App() {
   const mainRef = useRef(null);
+  const importInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('court');
   const [sessions, setSessions] = useState([]);
   const [settings, setSettings] = useState({ targetShots: 10 });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedSpotDetails, setSelectedSpotDetails] = useState(null);
   const [recordCelebration, setRecordCelebration] = useState(null);
+  const [isDemoData, setIsDemoData] = useState(false);
 
   const [currentInput, setCurrentInput] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -469,6 +494,8 @@ export default function App() {
       }
     }
 
+    const onboarded = localStorage.getItem(STORAGE_ONBOARDED_KEY) === 'true';
+
     if (parsedSessions) {
       // מתקן רטרואקטיבית תאריך שגוי שנשמר בעבר עבור אימון הדוגמה המובנה (מזוהה לפי ה-id הקבוע שלו)
       const fixedSessions = parsedSessions.map(s =>
@@ -480,18 +507,25 @@ export default function App() {
       if (JSON.stringify(fixedSessions) !== JSON.stringify(parsedSessions)) {
         localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(fixedSessions));
       }
+      // למי שכבר יש נתונים אמיתיים משמורים (כולל משתמשים ותיקים) - לוודא שלעולם לא יראו מצב דמה בעתיד
+      if (!onboarded) localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+    } else if (onboarded) {
+      // המשתמש כבר "סיים" את שלב ההיכרות (הזין אימון אמיתי או ניקה נתונים בעבר) - לא מציגים דמה, נשארים ריקים
+      setSessions([]);
     } else {
-      setSessions([INITIAL_SESSION]);
-      localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify([INITIAL_SESSION]));
+      // טעינה ראשונה אי פעם - מציגים מצב הדגמה במקום להתחיל מרשימה ריקה
+      setSessions(DEMO_SESSIONS);
+      setIsDemoData(true);
     }
   }, []);
 
   useEffect(() => {
-    if (sessions.length > 0) {
+    // נתוני דמה לעולם לא נשמרים בזיכרון - כדי שברענון הבא עדיין ניחשב "לא התחלתי" ולא "יש לי נתונים אמיתיים"
+    if (sessions.length > 0 && !isDemoData) {
       localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(sessions));
     }
     localStorage.setItem(STORAGE_SETTINGS_KEY, JSON.stringify(settings));
-  }, [sessions, settings]);
+  }, [sessions, settings, isDemoData]);
 
   const saveSession = () => {
     const entries = Object.entries(currentInput).filter(([, v]) => v !== '' && v !== undefined && v !== null);
@@ -511,15 +545,22 @@ export default function App() {
         data: cleanedInput
       };
 
-      const newPerc = sessionOverallPerc(newSession);
-      const priorPercs = sessions.map(sessionOverallPerc).filter(p => p !== null);
-      const priorBest = priorPercs.length > 0 ? Math.max(...priorPercs) : null;
-      if (newPerc !== null && priorBest !== null && newPerc > priorBest) {
-        const ma = sessionMadeAttempts(newSession);
-        setRecordCelebration({ perc: newPerc, made: ma.made, total: ma.total });
-      }
+      if (isDemoData) {
+        // האימון האמיתי הראשון שנשמר מוחק את נתוני ההדגמה ומתחיל מעקב אמיתי נקי
+        setIsDemoData(false);
+        localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+        setSessions([newSession]);
+      } else {
+        const newPerc = sessionOverallPerc(newSession);
+        const priorPercs = sessions.map(sessionOverallPerc).filter(p => p !== null);
+        const priorBest = priorPercs.length > 0 ? Math.max(...priorPercs) : null;
+        if (newPerc !== null && priorBest !== null && newPerc > priorBest) {
+          const ma = sessionMadeAttempts(newSession);
+          setRecordCelebration({ perc: newPerc, made: ma.made, total: ma.total });
+        }
 
-      setSessions([newSession, ...sessions]);
+        setSessions([newSession, ...sessions]);
+      }
     }
 
     setCurrentInput({});
@@ -570,12 +611,79 @@ export default function App() {
   const clearAllData = () => {
     if (window.confirm('אזהרה: כל היסטוריית האימונים תימחק לצמיתות. להמשיך?')) {
       setSessions([]);
+      setIsDemoData(false);
       setEditingId(null);
       setCurrentInput({});
       localStorage.removeItem(STORAGE_DATA_KEY);
+      localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
       setShowSettingsModal(false);
       setActiveTab('court');
     }
+  };
+
+  const exportData = async () => {
+    const payload = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      sessions: isDemoData ? [] : sessions,
+      settings
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const filename = `swish-10-10-גיבוי-${new Date().toISOString().slice(0, 10)}.json`;
+    const file = new File([json], filename, { type: 'application/json' });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: 'גיבוי Swish 10/10' });
+        return;
+      } catch {
+        // המשתמש ביטל את השיתוף, או שהשיתוף נכשל בפועל - נופלים חזרה על הורדה רגילה
+      }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const importedSessions = Array.isArray(parsed?.sessions) ? parsed.sessions : (Array.isArray(parsed) ? parsed : null);
+        if (!importedSessions || importedSessions.length === 0) {
+          window.alert('קובץ לא תקין - לא נמצאו אימונים לייבוא.');
+          return;
+        }
+        const looksValid = importedSessions.every(s => s && typeof s === 'object' && s.data && typeof s.data === 'object' && s.date);
+        if (!looksValid) {
+          window.alert('קובץ לא תקין - מבנה הנתונים לא מוכר.');
+          return;
+        }
+        if (!window.confirm(`נמצאו ${importedSessions.length} אימונים בקובץ. הייבוא יחליף את כל הנתונים הנוכחיים באפליקציה. להמשיך?`)) return;
+
+        setIsDemoData(false);
+        setEditingId(null);
+        setCurrentInput({});
+        setSessions([...importedSessions].sort((a, b) => new Date(b.date) - new Date(a.date)));
+        if (parsed?.settings && Number.isFinite(parsed.settings.targetShots) && parsed.settings.targetShots > 0) {
+          setSettings(prev => ({ ...prev, ...parsed.settings }));
+        }
+        localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+        window.alert('הנתונים יובאו בהצלחה!');
+      } catch {
+        window.alert('קובץ לא תקין - לא ניתן לקרוא אותו כ-JSON.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSpotClick = (spotId) => {
@@ -970,6 +1078,27 @@ export default function App() {
               </div>
 
               <div className="border-t border-[#2A2F3D] pt-6">
+                <p className="text-white font-bold text-sm mb-1">גיבוי ושחזור</p>
+                <p className="text-[#848B98] text-[10px] mb-3">שמור עותק של כל האימונים שלך כקובץ, כדי שלעולם לא תאבד אותם - גם אם תמחק את האפליקציה או תחליף מכשיר.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={exportData}
+                    disabled={isDemoData}
+                    className="bg-[#0F1115] text-[#E0E2E7] font-bold py-3.5 rounded-xl border border-[#3A4155] hover:border-[#FF8A00]/50 flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <Download size={16} /> ייצוא נתונים
+                  </button>
+                  <button
+                    onClick={() => importInputRef.current?.click()}
+                    className="bg-[#0F1115] text-[#E0E2E7] font-bold py-3.5 rounded-xl border border-[#3A4155] hover:border-[#FF8A00]/50 flex items-center justify-center gap-2"
+                  >
+                    <Upload size={16} /> ייבוא נתונים
+                  </button>
+                  <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={handleImportFile} />
+                </div>
+              </div>
+
+              <div className="border-t border-[#2A2F3D] pt-6">
                 <button
                   onClick={clearAllData}
                   className="w-full bg-red-500/10 text-red-500 font-bold py-4 rounded-xl border border-red-500/20 hover:bg-red-500/20 flex items-center justify-center gap-2"
@@ -991,6 +1120,14 @@ export default function App() {
         {/* מגרש ראשי */}
         {activeTab === 'court' && !showSettingsModal && (
           <div className="h-full flex flex-col p-4 animate-in fade-in">
+            {isDemoData && (
+              <div className="shrink-0 mb-3 px-3 py-2 rounded-xl border border-dashed border-[#FF8A00]/50 bg-[#FF8A00]/10 flex items-center gap-2">
+                <Sparkles size={14} className="text-[#FF8A00] shrink-0" />
+                <p className="text-[#FF8A00] text-[11px] font-bold leading-tight">
+                  מצב הדגמה - נתונים לדוגמה בלבד. ברגע שתזין אימון אמיתי ראשון, הם יוחלפו במעקב האמיתי שלך.
+                </p>
+              </div>
+            )}
             <div className="shrink-0 bg-[#1C202A] p-3 rounded-2xl mb-3 border border-[#2A2F3D] flex justify-between items-center shadow-lg">
               <div>
                 <p className="text-[#848B98] text-[10px] font-bold uppercase tracking-wider mb-0.5">
