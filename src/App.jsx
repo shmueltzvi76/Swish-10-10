@@ -424,6 +424,7 @@ export default function App() {
   const [settings, setSettings] = useState({ targetShots: 10 });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedSpotDetails, setSelectedSpotDetails] = useState(null);
+  const [recordCelebration, setRecordCelebration] = useState(null);
 
   const [currentInput, setCurrentInput] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -509,6 +510,15 @@ export default function App() {
         targetShots: settings.targetShots,
         data: cleanedInput
       };
+
+      const newPerc = sessionOverallPerc(newSession);
+      const priorPercs = sessions.map(sessionOverallPerc).filter(p => p !== null);
+      const priorBest = priorPercs.length > 0 ? Math.max(...priorPercs) : null;
+      if (newPerc !== null && priorBest !== null && newPerc > priorBest) {
+        const ma = sessionMadeAttempts(newSession);
+        setRecordCelebration({ perc: newPerc, made: ma.made, total: ma.total });
+      }
+
       setSessions([newSession, ...sessions]);
     }
 
@@ -816,9 +826,8 @@ export default function App() {
                  <p className="text-[#848B98] text-xs font-bold uppercase tracking-wider mb-2">אימון אחרון</p>
                  {selectedSpotDetails.s1 ? (
                     <div className="flex justify-between items-end">
-                       <span className="flex items-center gap-1.5 text-4xl font-black" style={{ color: selectedSpotDetails.s1.trend ? TREND_COLORS[selectedSpotDetails.s1.trend] : '#FFFFFF' }}>
+                       <span className="text-4xl font-black" style={{ color: selectedSpotDetails.s1.trend ? TREND_COLORS[selectedSpotDetails.s1.trend] : '#FFFFFF' }}>
                          {selectedSpotDetails.s1.perc}%
-                         <TrendArrow trend={selectedSpotDetails.s1.trend} size={20} />
                        </span>
                        <span dir="ltr" className="text-[#A0A6B1] text-sm font-medium mb-1">{selectedSpotDetails.s1.made}/{selectedSpotDetails.s1.target}</span>
                     </div>
@@ -829,15 +838,41 @@ export default function App() {
                  <p className="text-[#848B98] text-xs font-bold uppercase tracking-wider mb-2">אימון קודם</p>
                  {selectedSpotDetails.s2 ? (
                     <div className="flex justify-between items-end">
-                       <span className="flex items-center gap-1.5 text-3xl font-bold" style={{ color: selectedSpotDetails.s2.trend ? TREND_COLORS[selectedSpotDetails.s2.trend] : '#FFFFFF' }}>
+                       <span className="text-3xl font-bold" style={{ color: selectedSpotDetails.s2.trend ? TREND_COLORS[selectedSpotDetails.s2.trend] : '#FFFFFF' }}>
                          {selectedSpotDetails.s2.perc}%
-                         <TrendArrow trend={selectedSpotDetails.s2.trend} size={16} />
                        </span>
                        <span dir="ltr" className="text-[#848B98] text-sm mb-1">{selectedSpotDetails.s2.made}/{selectedSpotDetails.s2.target}</span>
                     </div>
                  ) : <p className="text-[#848B98] text-sm">אין נתונים מהאימון הקודם</p>}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* חגיגת שיא אישי - מוצג כשהאימון שנשמר שובר את השיא הכללי (אחוז קליעה כולל) של כל הזמנים */}
+      {recordCelebration && (
+        <div
+          className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-6 animate-in fade-in"
+          onClick={() => setRecordCelebration(null)}
+        >
+          <div
+            className="bg-gradient-to-b from-[#1C202A] to-[#161920] p-8 rounded-3xl border border-[#FF8A00]/40 shadow-2xl w-full max-w-[320px] text-center transform scale-100 animate-in zoom-in-95"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#FF8A00] to-[#E55D00] flex items-center justify-center shadow-lg shadow-[#FF8A00]/30">
+              <Trophy className="text-white w-10 h-10" />
+            </div>
+            <h3 className="text-2xl font-black text-white mb-1">שיא אישי חדש!</h3>
+            <p className="text-[#848B98] text-sm mb-5">האחוז הגבוה ביותר שלך אי פעם באימון שלם</p>
+            <p className="text-5xl font-black text-[#FF8A00] mb-1">{recordCelebration.perc}%</p>
+            <p dir="ltr" className="text-[#848B98] text-sm mb-6">{recordCelebration.made}/{recordCelebration.total}</p>
+            <button
+              onClick={() => setRecordCelebration(null)}
+              className="w-full bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115] font-black text-lg py-3.5 rounded-xl shadow-lg shadow-[#FF8A00]/20"
+            >
+              יאללה, קדימה!
+            </button>
           </div>
         </div>
       )}
@@ -1396,7 +1431,7 @@ export default function App() {
                               <p className="text-[10px] mt-0.5" style={{ color: noted ? '#FF8A00' : '#596070' }}>{noted ? 'יש הערות' : 'אין הערות עדיין'}</p>
                             </div>
                           </div>
-                          <span className="text-lg font-black flex items-center gap-1" style={{ color: sTrendColor }}>{sPerc}%<TrendArrow trend={sTrend} size={12} /></span>
+                          <span className="text-lg font-black" style={{ color: sTrendColor }}>{sPerc}%</span>
                         </button>
                       );
                     })}
@@ -1426,7 +1461,7 @@ export default function App() {
                   <p className="text-white font-bold text-sm">{new Date(journalSession.date).toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'numeric' })}</p>
                   <p className="text-[10px] text-[#848B98] mt-0.5" dir="ltr">{jMade}/{jTotal} קליעות</p>
                 </div>
-                <span className="text-xl font-black flex items-center gap-1" style={{ color: jTrendColor }}>{jPerc}%<TrendArrow trend={jTrend} size={14} /></span>
+                <span className="text-xl font-black" style={{ color: jTrendColor }}>{jPerc}%</span>
               </div>
 
               <div className="mb-6">
