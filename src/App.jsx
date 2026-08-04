@@ -444,16 +444,85 @@ const SmartLineChart = ({ data }) => {
 };
 
 
+// טוען את המצב ההתחלתי (אימונים, הגדרות, האם להציג דמה) פעם אחת בלבד, באופן סינכרוני,
+// לפני הרינדור הראשון - כדי שהמסך הראשון שהמשתמש רואה כבר יהיה הנכון, בלי הבזק ריק שקופץ
+// לתוכן האמיתי רגע אחרי (מה שגרם לתחושת פתיחה "לא חלקה").
+let cachedInitialLoad = null;
+const loadInitialState = () => {
+  if (cachedInitialLoad) return cachedInitialLoad;
+
+  const savedData = localStorage.getItem(STORAGE_DATA_KEY);
+  const savedSettingsRaw = localStorage.getItem(STORAGE_SETTINGS_KEY);
+
+  let settings = { targetShots: 10 };
+  if (savedSettingsRaw) {
+    try {
+      const parsedSettings = JSON.parse(savedSettingsRaw);
+      if (parsedSettings && Number.isFinite(parsedSettings.targetShots) && parsedSettings.targetShots > 0) {
+        settings = parsedSettings;
+      }
+    } catch {
+      // ignore corrupted settings, keep defaults
+    }
+  }
+
+  let parsedSessions = null;
+  if (savedData) {
+    try {
+      const parsed = JSON.parse(savedData);
+      if (Array.isArray(parsed) && parsed.length > 0) parsedSessions = parsed;
+    } catch {
+      // ignore corrupted data, fall back to initial session
+    }
+  }
+
+  const onboarded = localStorage.getItem(STORAGE_ONBOARDED_KEY) === 'true';
+
+  // בגרסאות ישנות של האפליקציה (לפני שהיה מצב דגמה אמיתי), טעינה ריקה הייתה שומרת אוטומטית
+  // אימון-דוגמה בודד וקבוע (INITIAL_SESSION) כאילו הוא נתון אמיתי. כדי שמשתמשים כאלה עדיין
+  // יקבלו את חוויית הדגמה המלאה (ולא רק אימון בודד "אמיתי" למראית עין), מתייחסים למצב הזה
+  // בדיוק כמו למי שטרם התחיל בכלל.
+  const isLegacyPlaceholderOnly = !!parsedSessions && parsedSessions.length === 1 && parsedSessions[0].id === INITIAL_SESSION.id && !onboarded;
+
+  let sessions;
+  let isDemoData = false;
+
+  if (parsedSessions && !isLegacyPlaceholderOnly) {
+    // מתקן רטרואקטיבית תאריך שגוי שנשמר בעבר עבור אימון הדוגמה המובנה (מזוהה לפי ה-id הקבוע שלו)
+    const fixedSessions = parsedSessions.map(s =>
+      s.id === INITIAL_SESSION.id && s.date !== INITIAL_SESSION.date
+        ? { ...s, date: INITIAL_SESSION.date }
+        : s
+    );
+    sessions = fixedSessions;
+    if (JSON.stringify(fixedSessions) !== JSON.stringify(parsedSessions)) {
+      localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(fixedSessions));
+    }
+    // למי שכבר יש נתונים אמיתיים משמורים (כולל משתמשים ותיקים) - לוודא שלעולם לא יראו מצב דמה בעתיד
+    if (!onboarded) localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
+  } else if (onboarded) {
+    // המשתמש כבר "סיים" את שלב ההיכרות (הזין אימון אמיתי או ניקה נתונים בעבר) - לא מציגים דמה, נשארים ריקים
+    sessions = [];
+  } else {
+    // טעינה ראשונה אי פעם (או רק אימון הדוגמה הישן שנחשב "לא-אמיתי") - מציגים מצב הדגמה
+    sessions = DEMO_SESSIONS;
+    isDemoData = true;
+  }
+
+  cachedInitialLoad = { sessions, settings, isDemoData };
+  return cachedInitialLoad;
+};
+
 export default function App() {
   const mainRef = useRef(null);
   const importInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState('court');
-  const [sessions, setSessions] = useState([]);
-  const [settings, setSettings] = useState({ targetShots: 10 });
+  const [sessions, setSessions] = useState(() => loadInitialState().sessions);
+  const [settings, setSettings] = useState(() => loadInitialState().settings);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedSpotDetails, setSelectedSpotDetails] = useState(null);
   const [recordCelebration, setRecordCelebration] = useState(null);
-  const [isDemoData, setIsDemoData] = useState(false);
+  const [isDemoData, setIsDemoData] = useState(() => loadInitialState().isDemoData);
   const [showSettingsHint, setShowSettingsHint] = useState(() => localStorage.getItem(STORAGE_SETTINGS_SEEN_KEY) !== 'true');
 
   const [currentInput, setCurrentInput] = useState({});
@@ -473,62 +542,6 @@ export default function App() {
   useEffect(() => {
     if (settings.showJournal !== true && activeTab === 'journal') setActiveTab('court');
   }, [settings.showJournal, activeTab]);
-
-  useEffect(() => {
-    const savedData = localStorage.getItem(STORAGE_DATA_KEY);
-    const savedSettings = localStorage.getItem(STORAGE_SETTINGS_KEY);
-
-    if (savedSettings) {
-      try {
-        const parsedSettings = JSON.parse(savedSettings);
-        if (parsedSettings && Number.isFinite(parsedSettings.targetShots) && parsedSettings.targetShots > 0) {
-          setSettings(parsedSettings);
-        }
-      } catch {
-        // ignore corrupted settings, keep defaults
-      }
-    }
-
-    let parsedSessions = null;
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        if (Array.isArray(parsed) && parsed.length > 0) parsedSessions = parsed;
-      } catch {
-        // ignore corrupted data, fall back to initial session
-      }
-    }
-
-    const onboarded = localStorage.getItem(STORAGE_ONBOARDED_KEY) === 'true';
-
-    // בגרסאות ישנות של האפליקציה (לפני שהיה מצב דגמה אמיתי), טעינה ריקה הייתה שומרת אוטומטית
-    // אימון-דוגמה בודד וקבוע (INITIAL_SESSION) כאילו הוא נתון אמיתי. כדי שמשתמשים כאלה עדיין
-    // יקבלו את חוויית הדגמה המלאה (ולא רק אימון בודד "אמיתי" למראית עין), מתייחסים למצב הזה
-    // בדיוק כמו למי שטרם התחיל בכלל.
-    const isLegacyPlaceholderOnly = !!parsedSessions && parsedSessions.length === 1 && parsedSessions[0].id === INITIAL_SESSION.id && !onboarded;
-
-    if (parsedSessions && !isLegacyPlaceholderOnly) {
-      // מתקן רטרואקטיבית תאריך שגוי שנשמר בעבר עבור אימון הדוגמה המובנה (מזוהה לפי ה-id הקבוע שלו)
-      const fixedSessions = parsedSessions.map(s =>
-        s.id === INITIAL_SESSION.id && s.date !== INITIAL_SESSION.date
-          ? { ...s, date: INITIAL_SESSION.date }
-          : s
-      );
-      setSessions(fixedSessions);
-      if (JSON.stringify(fixedSessions) !== JSON.stringify(parsedSessions)) {
-        localStorage.setItem(STORAGE_DATA_KEY, JSON.stringify(fixedSessions));
-      }
-      // למי שכבר יש נתונים אמיתיים משמורים (כולל משתמשים ותיקים) - לוודא שלעולם לא יראו מצב דמה בעתיד
-      if (!onboarded) localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
-    } else if (onboarded) {
-      // המשתמש כבר "סיים" את שלב ההיכרות (הזין אימון אמיתי או ניקה נתונים בעבר) - לא מציגים דמה, נשארים ריקים
-      setSessions([]);
-    } else {
-      // טעינה ראשונה אי פעם (או רק אימון הדוגמה הישן שנחשב "לא-אמיתי") - מציגים מצב הדגמה
-      setSessions(DEMO_SESSIONS);
-      setIsDemoData(true);
-    }
-  }, []);
 
   useEffect(() => {
     // נתוני דמה לעולם לא נשמרים בזיכרון - כדי שברענון הבא עדיין ניחשב "לא התחלתי" ולא "יש לי נתונים אמיתיים"
