@@ -60,6 +60,7 @@ const GROUP_ORDER = ['צד שמאל', 'אופקי', 'צד ימין', 'מול ה�
 const STORAGE_DATA_KEY = 'swish_pro_data_v19';
 const STORAGE_SETTINGS_KEY = 'swish_pro_settings_v19';
 const STORAGE_ONBOARDED_KEY = 'swish_pro_onboarded_v19';
+const STORAGE_SETTINGS_SEEN_KEY = 'swish_pro_settings_seen_v19';
 
 // נתוני הדגמה בלבד - מוצגים רק כשאין עדיין אימונים אמיתיים, כדי להראות את האפליקציה "בשיא תפארתה".
 // נמחקים אוטומטית ברגע שנשמר אימון אמיתי ראשון, או שהנתונים מנוקים ידנית בהגדרות.
@@ -73,10 +74,6 @@ const DEMO_SESSIONS = [
     }
   },
   {
-    id: 9004, date: '2026-08-02T18:00:00.000Z', targetShots: 10, isDemo: true,
-    data: { 1: 8, 2: 7, 3: 8, 4: 6, 5: 9, 6: 8, 7: 7, 8: 9, 9: 7, 10: 8, 11: 7, 12: 9, 13: 7, 14: 8, 15: 9, 16: 8, 17: 7, 18: 9, 19: 7, 20: 8, 21: 7 }
-  },
-  {
     id: 9003, date: '2026-07-28T18:00:00.000Z', targetShots: 10, isDemo: true,
     data: { 1: 5, 2: 4, 3: 5, 4: 3, 5: 6, 6: 5, 7: 4, 8: 6, 9: 4, 10: 5, 11: 4, 12: 6, 13: 4, 14: 5, 15: 6, 16: 5, 17: 4, 18: 6, 19: 4, 20: 5, 21: 4 }
   },
@@ -87,10 +84,6 @@ const DEMO_SESSIONS = [
   {
     id: 9001, date: '2026-07-14T18:00:00.000Z', targetShots: 10, isDemo: true,
     data: { 1: 4, 2: 3, 3: 5, 4: 2, 5: 6, 6: 5, 7: 4, 8: 6, 9: 3, 10: 5, 11: 4, 12: 6, 13: 3, 14: 5, 15: 6, 16: 5, 17: 4, 18: 6, 19: 3, 20: 5, 21: 4 }
-  },
-  {
-    id: 9000, date: '2026-07-07T18:00:00.000Z', targetShots: 10, isDemo: true,
-    data: { 1: 3, 2: 2, 3: 4, 4: 2, 5: 5, 6: 4, 7: 3, 8: 5, 9: 2, 10: 4, 11: 3, 12: 5, 13: 2, 14: 4, 15: 5, 16: 4, 17: 3, 18: 5, 19: 2, 20: 4, 21: 3 }
   }
 ];
 
@@ -461,6 +454,7 @@ export default function App() {
   const [selectedSpotDetails, setSelectedSpotDetails] = useState(null);
   const [recordCelebration, setRecordCelebration] = useState(null);
   const [isDemoData, setIsDemoData] = useState(false);
+  const [showSettingsHint, setShowSettingsHint] = useState(() => localStorage.getItem(STORAGE_SETTINGS_SEEN_KEY) !== 'true');
 
   const [currentInput, setCurrentInput] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -1022,10 +1016,19 @@ export default function App() {
             </div>
           </div>
           <button
-            onClick={() => setShowSettingsModal(true)}
-            className="p-2.5 rounded-full bg-[#1C202A] text-[#848B98] border border-[#2A2F3D] hover:text-[#FF8A00] transition-colors"
+            onClick={() => {
+              setShowSettingsModal(true);
+              if (showSettingsHint) {
+                setShowSettingsHint(false);
+                localStorage.setItem(STORAGE_SETTINGS_SEEN_KEY, 'true');
+              }
+            }}
+            className="relative p-2.5 rounded-full bg-[#1C202A] text-[#848B98] border border-[#2A2F3D] hover:text-[#FF8A00] transition-colors"
           >
             <Settings size={20} />
+            {showSettingsHint && (
+              <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 rounded-full bg-[#EF4444] border-2 border-[#161920] animate-pulse"></span>
+            )}
           </button>
         </div>
       </header>
@@ -1036,7 +1039,16 @@ export default function App() {
         {showSettingsModal && (
           <div className="fixed inset-0 z-40 bg-[#0F1115]/95 backdrop-blur-sm p-6 overflow-y-auto animate-in fade-in">
             <div className="bg-[#1C202A] rounded-3xl p-6 border border-[#2A2F3D] shadow-2xl mt-10">
-              <h2 className="text-xl font-bold text-white mb-6">הגדרות אימון</h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">הגדרות אימון</h2>
+                <button
+                  onClick={() => setShowSettingsModal(false)}
+                  aria-label="סגור הגדרות"
+                  className="text-[#848B98] hover:text-white bg-[#0F1115] rounded-full p-2 transition-colors border border-[#2A2F3D] shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
               <div className="mb-8">
                 <label className="block text-sm font-medium text-[#A0A6B1] mb-3">
