@@ -507,7 +507,13 @@ export default function App() {
 
     const onboarded = localStorage.getItem(STORAGE_ONBOARDED_KEY) === 'true';
 
-    if (parsedSessions) {
+    // בגרסאות ישנות של האפליקציה (לפני שהיה מצב דגמה אמיתי), טעינה ריקה הייתה שומרת אוטומטית
+    // אימון-דוגמה בודד וקבוע (INITIAL_SESSION) כאילו הוא נתון אמיתי. כדי שמשתמשים כאלה עדיין
+    // יקבלו את חוויית הדגמה המלאה (ולא רק אימון בודד "אמיתי" למראית עין), מתייחסים למצב הזה
+    // בדיוק כמו למי שטרם התחיל בכלל.
+    const isLegacyPlaceholderOnly = !!parsedSessions && parsedSessions.length === 1 && parsedSessions[0].id === INITIAL_SESSION.id && !onboarded;
+
+    if (parsedSessions && !isLegacyPlaceholderOnly) {
       // מתקן רטרואקטיבית תאריך שגוי שנשמר בעבר עבור אימון הדוגמה המובנה (מזוהה לפי ה-id הקבוע שלו)
       const fixedSessions = parsedSessions.map(s =>
         s.id === INITIAL_SESSION.id && s.date !== INITIAL_SESSION.date
@@ -524,7 +530,7 @@ export default function App() {
       // המשתמש כבר "סיים" את שלב ההיכרות (הזין אימון אמיתי או ניקה נתונים בעבר) - לא מציגים דמה, נשארים ריקים
       setSessions([]);
     } else {
-      // טעינה ראשונה אי פעם - מציגים מצב הדגמה במקום להתחיל מרשימה ריקה
+      // טעינה ראשונה אי פעם (או רק אימון הדוגמה הישן שנחשב "לא-אמיתי") - מציגים מצב הדגמה
       setSessions(DEMO_SESSIONS);
       setIsDemoData(true);
     }
