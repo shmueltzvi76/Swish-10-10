@@ -100,6 +100,61 @@ const INITIAL_SESSION = {
   }
 };
 
+// === דיאלוגים מודרניים (מחליפים window.confirm/window.alert המכוערים של הדפדפן) ===
+// ממומש כ"סינגלטון" עצמאי מחוץ לעץ הקומפוננטות (לא context) כדי שכל פונקציה בקובץ - כולל
+// קומפוננטות פנימיות כמו סרגל העריכה העשיר - תוכל לקרוא לו בלי צורך להעביר props.
+// confirmModern/alertModern מחזירים Promise<boolean>, בדיוק כמו window.confirm/alert אך אסינכרוני.
+let dialogListener = null;
+const openDialog = (config) => new Promise((resolve) => {
+  if (dialogListener) dialogListener({ ...config, resolve });
+  else resolve(false);
+});
+const confirmModern = (message, opts = {}) => openDialog({ type: 'confirm', message, ...opts });
+const alertModern = (message, opts = {}) => openDialog({ type: 'alert', message, ...opts });
+
+const DialogHost = () => {
+  const [dialog, setDialog] = useState(null);
+
+  useEffect(() => {
+    dialogListener = (config) => setDialog(config);
+    return () => { dialogListener = null; };
+  }, []);
+
+  if (!dialog) return null;
+  const close = (result) => { dialog.resolve(result); setDialog(null); };
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in"
+      onClick={() => close(false)}
+    >
+      <div
+        className="bg-[#1C202A] rounded-3xl border border-[#2A2F3D] shadow-2xl w-full max-w-[320px] p-6 animate-in zoom-in-95"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {dialog.title && <h3 className="text-white font-bold text-base mb-2">{dialog.title}</h3>}
+        <p className="text-[#E0E2E7] text-sm leading-relaxed whitespace-pre-line">{dialog.message}</p>
+        <div className="flex gap-3 mt-6">
+          {dialog.type === 'confirm' && (
+            <button
+              onClick={() => close(false)}
+              className="flex-1 py-3 rounded-xl bg-[#2A2F3D] text-[#E0E2E7] font-bold text-sm active:scale-95 transition-transform"
+            >
+              {dialog.cancelText || 'ביטול'}
+            </button>
+          )}
+          <button
+            onClick={() => close(true)}
+            className={`flex-1 py-3 rounded-xl font-bold text-sm active:scale-95 transition-transform ${dialog.danger ? 'bg-[#EF4444] text-white' : 'bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115]'}`}
+          >
+            {dialog.confirmText || (dialog.type === 'alert' ? 'הבנתי' : 'אישור')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // === תפריט מותאם אישית ===
 const CustomDropdown = ({ value, options, onChange, icon: Icon }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -269,9 +324,9 @@ const RichTextEditor = ({ initialValue, onChange, placeholder }) => {
         <button
           type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
+          onClick={async () => {
             if (!ref.current || !ref.current.textContent.trim()) return;
-            if (!window.confirm('למחוק את כל הטקסט בהערה הזו?')) return;
+            if (!(await confirmModern('למחוק את כל הטקסט בהערה הזו?', { title: 'מחיקת טקסט', confirmText: 'כן, מחק', danger: true }))) return;
             ref.current.focus();
             document.execCommand('selectAll');
             document.execCommand('delete');
@@ -609,8 +664,8 @@ export default function App() {
     setActiveTab('input');
   };
 
-  const handleDelete = (id) => {
-    if (window.confirm('האם למחוק אימון זה?')) {
+  const handleDelete = async (id) => {
+    if (await confirmModern('האם למחוק אימון זה?', { title: 'מחיקת אימון', confirmText: 'כן, מחק', danger: true })) {
       const filtered = sessions.filter(s => s.id !== id);
       setSessions(filtered);
       if (filtered.length === 0) localStorage.removeItem(STORAGE_DATA_KEY);
@@ -629,20 +684,36 @@ export default function App() {
     const last = sessions[0];
     if (!last || !last.isShort || last.shortDismissed) return;
 
-    const filledCount = Object.keys(last.data).length;
-    const wantsToContinue = window.confirm(`האימון האחרון שלך היה חלקי (${filledCount} מתוך ${SPOTS.length} מיקומים). להמשיך אותו?`);
-    if (wantsToContinue) {
-      handleEdit(last);
-    } else if (window.confirm('למחוק את האימון החלקי הקודם? (אם לא, הוא יישאר שמור כפי שהוא)')) {
-      setSessions(prev => {
-        const filtered = prev.filter(s => s.id !== last.id);
-        if (filtered.length === 0) localStorage.removeItem(STORAGE_DATA_KEY);
-        return filtered;
-      });
-      if (journalSessionId === last.id) setJournalSessionId(null);
-    } else {
-      setSessions(prev => prev.map(s => s.id === last.id ? { ...s, shortDismissed: true } : s));
-    }
+    let cancelled = false;
+    (async () => {
+      const filledCount = Object.keys(last.data).length;
+      const wantsToContinue = await confirmModern(
+        `האימון האחרון שלך היה חלקי (${filledCount} מתוך ${SPOTS.length} מיקומים). להמשיך אותו?`,
+        { title: 'אימון חלקי', confirmText: 'כן, להמשיך' }
+      );
+      if (cancelled) return;
+      if (wantsToContinue) {
+        handleEdit(last);
+        return;
+      }
+      const wantsToDelete = await confirmModern(
+        'למחוק את האימון החלקי הקודם? (אם לא, הוא יישאר שמור כפי שהוא)',
+        { title: 'אימון חלקי', confirmText: 'כן, למחוק', cancelText: 'לא, להשאיר', danger: true }
+      );
+      if (cancelled) return;
+      if (wantsToDelete) {
+        setSessions(prev => {
+          const filtered = prev.filter(s => s.id !== last.id);
+          if (filtered.length === 0) localStorage.removeItem(STORAGE_DATA_KEY);
+          return filtered;
+        });
+        if (journalSessionId === last.id) setJournalSessionId(null);
+      } else {
+        setSessions(prev => prev.map(s => s.id === last.id ? { ...s, shortDismissed: true } : s));
+      }
+    })();
+
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, editingId]);
 
@@ -663,8 +734,8 @@ export default function App() {
     return Object.values(notes.zones || {}).some(html => strip(html));
   };
 
-  const clearAllData = () => {
-    if (window.confirm('אזהרה: כל היסטוריית האימונים תימחק לצמיתות. להמשיך?')) {
+  const clearAllData = async () => {
+    if (await confirmModern('אזהרה: כל היסטוריית האימונים תימחק לצמיתות. להמשיך?', { title: 'איפוס נתונים', confirmText: 'כן, מחק הכל', danger: true })) {
       setSessions([]);
       setIsDemoData(false);
       setEditingId(null);
@@ -710,20 +781,20 @@ export default function App() {
     e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(reader.result);
         const importedSessions = Array.isArray(parsed?.sessions) ? parsed.sessions : (Array.isArray(parsed) ? parsed : null);
         if (!importedSessions || importedSessions.length === 0) {
-          window.alert('קובץ לא תקין - לא נמצאו אימונים לייבוא.');
+          await alertModern('קובץ לא תקין - לא נמצאו אימונים לייבוא.', { title: 'שגיאה בייבוא' });
           return;
         }
         const looksValid = importedSessions.every(s => s && typeof s === 'object' && s.data && typeof s.data === 'object' && s.date);
         if (!looksValid) {
-          window.alert('קובץ לא תקין - מבנה הנתונים לא מוכר.');
+          await alertModern('קובץ לא תקין - מבנה הנתונים לא מוכר.', { title: 'שגיאה בייבוא' });
           return;
         }
-        if (!window.confirm(`נמצאו ${importedSessions.length} אימונים בקובץ. הייבוא יחליף את כל הנתונים הנוכחיים באפליקציה. להמשיך?`)) return;
+        if (!(await confirmModern(`נמצאו ${importedSessions.length} אימונים בקובץ. הייבוא יחליף את כל הנתונים הנוכחיים באפליקציה. להמשיך?`, { title: 'ייבוא נתונים', confirmText: 'כן, ייבא' }))) return;
 
         setIsDemoData(false);
         setEditingId(null);
@@ -733,9 +804,9 @@ export default function App() {
           setSettings(prev => ({ ...prev, ...parsed.settings }));
         }
         localStorage.setItem(STORAGE_ONBOARDED_KEY, 'true');
-        window.alert('הנתונים יובאו בהצלחה!');
+        await alertModern('הנתונים יובאו בהצלחה!', { title: 'הצלחה' });
       } catch {
-        window.alert('קובץ לא תקין - לא ניתן לקרוא אותו כ-JSON.');
+        await alertModern('קובץ לא תקין - לא ניתן לקרוא אותו כ-JSON.', { title: 'שגיאה בייבוא' });
       }
     };
     reader.readAsText(file);
@@ -819,8 +890,55 @@ export default function App() {
 
   const latestSessionPerc = useMemo(() => sessionOverallPerc(latestSession) ?? 0, [latestSession]);
   const comparisonSessionPerc = useMemo(() => sessionOverallPerc(comparisonSession), [comparisonSession]);
-  const overallTrend = getTrend(latestSessionPerc, comparisonSessionPerc);
-  const overallTrendColor = overallTrend ? TREND_COLORS[overallTrend] : '#FF8A00';
+
+  // === "תצוגה אפקטיבית" - לצורך תצוגה בלבד (מגרש + כרטיס "האימון האחרון שלך") ===
+  // באימון קצר, המקומות שלא נזרקו לא צריכים "להיעלם" מהמגרש או לאפס את האחוז הכללי - הם
+  // פשוט ממשיכים להראות את מה שהיו קודם. לכל עמדה מחפשים אחורה בהיסטוריה עד מציאת ערך אמיתי
+  // שהוזן בפועל. זה לא משפיע על שום דבר אחר (סטטיסטיקות/מסקנות/חלוקה לאזורים ממשיכות
+  // להתבסס אך ורק על מה שבאמת נזרק, בלי "להמציא" נתונים).
+  const findEffectiveSpotValue = (spotId, fromIdx) => {
+    for (let i = fromIdx; i < sessions.length; i++) {
+      if (sessions[i].data[spotId] !== undefined) return { value: sessions[i].data[spotId], idx: i };
+    }
+    return null;
+  };
+
+  const effectiveLatestMerge = useMemo(() => {
+    if (!sessions.length) return {};
+    const merged = {};
+    SPOTS.forEach(spot => {
+      const found = findEffectiveSpotValue(spot.id, 0);
+      if (found) merged[spot.id] = found;
+    });
+    return merged;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions]);
+
+  const effectiveLatestMA = useMemo(() => {
+    const entries = Object.values(effectiveLatestMerge);
+    return {
+      made: entries.reduce((a, e) => a + e.value, 0),
+      total: entries.length * (latestSession?.targetShots || settings.targetShots)
+    };
+  }, [effectiveLatestMerge, latestSession, settings.targetShots]);
+
+  const effectiveLatestPerc = effectiveLatestMA.total > 0 ? Math.round((effectiveLatestMA.made / effectiveLatestMA.total) * 100) : 0;
+
+  const effectivePrevMA = useMemo(() => {
+    const prevValues = Object.entries(effectiveLatestMerge)
+      .map(([spotId, found]) => findEffectiveSpotValue(Number(spotId), found.idx + 1)?.value)
+      .filter(v => v !== undefined);
+    if (!prevValues.length) return null;
+    return {
+      made: prevValues.reduce((a, b) => a + b, 0),
+      total: prevValues.length * (comparisonSession?.targetShots || settings.targetShots)
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveLatestMerge, comparisonSession, settings.targetShots]);
+
+  const effectivePrevPerc = effectivePrevMA && effectivePrevMA.total > 0 ? Math.round((effectivePrevMA.made / effectivePrevMA.total) * 100) : null;
+  const effectiveOverallTrend = getTrend(effectiveLatestPerc, effectivePrevPerc);
+  const effectiveOverallTrendColor = effectiveOverallTrend ? TREND_COLORS[effectiveOverallTrend] : '#FF8A00';
 
   const stats = useMemo(() => {
     if (!sessions.length) return null;
@@ -978,6 +1096,8 @@ export default function App() {
 
   return (
     <div className="h-dvh flex flex-col overflow-hidden bg-[#0F1115] text-[#E0E2E7] font-sans selection:bg-[#FF8A00]/30" dir="rtl">
+
+      <DialogHost />
 
       {/* ===================== מודל פרטי נקודה ===================== */}
       {selectedSpotDetails && (
@@ -1240,9 +1360,9 @@ export default function App() {
               </div>
               <div
                 className="text-left px-3 py-1.5 rounded-xl border"
-                style={{ background: `linear-gradient(to bottom right, ${overallTrendColor}33, ${overallTrendColor}0D)`, borderColor: `${overallTrendColor}33` }}
+                style={{ background: `linear-gradient(to bottom right, ${effectiveOverallTrendColor}33, ${effectiveOverallTrendColor}0D)`, borderColor: `${effectiveOverallTrendColor}33` }}
               >
-                <p className="text-xl font-black flex items-center gap-1" style={{ color: overallTrendColor }}>{latestSessionPerc}%<TrendArrow trend={overallTrend} size={14} /></p>
+                <p className="text-xl font-black flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>{effectiveLatestPerc}%<TrendArrow trend={effectiveOverallTrend} size={14} /></p>
               </div>
             </div>
 
@@ -1271,9 +1391,11 @@ export default function App() {
               </svg>
 
               {SPOTS.map((spot) => {
-                const score = latestSession?.data[spot.id];
-                if (score === undefined) return null;
-                const trend = getTrend(score, comparisonSession?.data[spot.id]);
+                const found = effectiveLatestMerge[spot.id];
+                if (!found) return null;
+                const score = found.value;
+                const prevFound = findEffectiveSpotValue(spot.id, found.idx + 1);
+                const trend = getTrend(score, prevFound?.value);
                 const trendColor = trend ? TREND_COLORS[trend] : '#FFFFFF';
                 return (
                   <button
@@ -1412,20 +1534,27 @@ export default function App() {
                 </div>
                 <div className="flex justify-between items-end relative z-10">
                   <div>
-                    <p className="text-4xl font-black leading-none" style={{ color: overallTrendColor }}>{stats.lastPerc}<span className="text-xl">%</span></p>
-                    {overallTrend && (
-                      <p className="text-[10px] font-bold mt-1 flex items-center gap-1" style={{ color: overallTrendColor }}>
-                        {overallTrend === 'up' && <><ArrowUp size={11} /> שיא חדש!</>}
-                        {overallTrend === 'down' && <><ArrowDown size={11} /> ירידה מהאימון הקודם</>}
-                        {overallTrend === 'same' && <><Minus size={11} /> ללא שינוי</>}
+                    <p className="text-4xl font-black leading-none" style={{ color: effectiveOverallTrendColor }}>{effectiveLatestPerc}<span className="text-xl">%</span></p>
+                    {effectiveOverallTrend && (
+                      <p className="text-[10px] font-bold mt-1 flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>
+                        {effectiveOverallTrend === 'up' && <><ArrowUp size={11} /> שיא חדש!</>}
+                        {effectiveOverallTrend === 'down' && <><ArrowDown size={11} /> ירידה מהאימון הקודם</>}
+                        {effectiveOverallTrend === 'same' && <><Minus size={11} /> ללא שינוי</>}
                       </p>
                     )}
                   </div>
                   <div className="text-right">
-                    <p dir="ltr" className="text-[#E0E2E7] font-bold">{stats.lastMade} / {stats.lastShots}</p>
+                    <p dir="ltr" className="text-[#E0E2E7] font-bold">{effectiveLatestMA.made} / {effectiveLatestMA.total}</p>
                     <p className="text-[#848B98] text-[10px]">קליעות מהאימון האחרון</p>
                   </div>
                 </div>
+
+                {latestSession.isShort && (
+                  <div className="mt-3 pt-3 border-t border-[#2A2F3D]/60 flex justify-between items-center relative z-10">
+                    <p className="text-[#FF8A00] text-[10px] font-bold bg-[#FF8A00]/15 px-2 py-1 rounded-md">מהאימון הקצר בפועל</p>
+                    <p dir="ltr" className="text-[#A0A6B1] text-xs font-bold">{stats.lastMade} / {stats.lastShots} <span className="text-[#848B98]">({stats.lastPerc}%)</span></p>
+                  </div>
+                )}
               </div>
             )}
 
