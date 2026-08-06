@@ -562,11 +562,19 @@ export default function App() {
       );
       setSessions(updatedSessions);
     } else {
+      // אימון קצר - כשלא כל המיקומים הוזנו (למשל כי האימון היה קצר יותר), המיקומים
+      // שלא נגעו בהם "יורשים" את הציון מהאימון הקודם במקום להישאר ריקים - כך האחוז
+      // הכללי לא נפגע סתם כי האימון היה קצר, ורק המיקומים שבאמת נזרקו משנים את הציון שלהם.
+      const carrySource = isDemoData ? null : previousSession;
+      const isShortSession = !!carrySource && SPOTS.some(s => cleanedInput[s.id] === undefined && carrySource.data[s.id] !== undefined);
+      const fullData = carrySource ? { ...carrySource.data, ...cleanedInput } : cleanedInput;
+
       const newSession = {
         id: Date.now(),
         date: new Date().toISOString(),
         targetShots: settings.targetShots,
-        data: cleanedInput
+        data: fullData,
+        ...(isShortSession ? { isShort: true, notes: { general: '<b>היום היה אימון קצר</b>', zones: {} } } : {})
       };
 
       if (isDemoData) {
@@ -1578,7 +1586,12 @@ export default function App() {
                   return (
                     <div key={session.id} className="bg-[#1C202A] p-4 rounded-xl border border-[#2A2F3D] flex justify-between items-center relative overflow-hidden group">
                       <div>
-                        <p className="text-white font-bold text-sm">אימון {sessions.length - idx}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-white font-bold text-sm">אימון {sessions.length - idx}</p>
+                          {session.isShort && (
+                            <span className="text-[9px] font-bold text-[#FF8A00] bg-[#FF8A00]/15 px-1.5 py-0.5 rounded-md">אימון קצר</span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-[#848B98] mt-0.5">{new Date(session.date).toLocaleString('he-IL')}</p>
                       </div>
 
@@ -1640,7 +1653,12 @@ export default function App() {
                               <FileText size={14} className={noted ? 'text-[#FF8A00]' : 'text-[#596070]'} />
                             </div>
                             <div>
-                              <p className="text-white font-bold text-sm">אימון {sessions.length - idx}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-white font-bold text-sm">אימון {sessions.length - idx}</p>
+                                {session.isShort && (
+                                  <span className="text-[9px] font-bold text-[#FF8A00] bg-[#FF8A00]/15 px-1.5 py-0.5 rounded-md">אימון קצר</span>
+                                )}
+                              </div>
                               <p className="text-[10px] text-[#848B98] mt-0.5">{new Date(session.date).toLocaleString('he-IL')}</p>
                               <p className="text-[10px] mt-0.5" style={{ color: noted ? '#FF8A00' : '#596070' }}>{noted ? 'יש הערות' : 'אין הערות עדיין'}</p>
                             </div>
