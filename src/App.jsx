@@ -558,22 +558,21 @@ export default function App() {
 
     if (editingId) {
       const updatedSessions = sessions.map(s =>
-        s.id === editingId ? { ...s, data: cleanedInput } : s
+        s.id === editingId ? { ...s, data: cleanedInput, isShort: SPOTS.some(spot => cleanedInput[spot.id] === undefined) } : s
       );
       setSessions(updatedSessions);
     } else {
-      // אימון קצר - כשלא כל המיקומים הוזנו (למשל כי האימון היה קצר יותר), המיקומים
-      // שלא נגעו בהם "יורשים" את הציון מהאימון הקודם במקום להישאר ריקים - כך האחוז
-      // הכללי לא נפגע סתם כי האימון היה קצר, ורק המיקומים שבאמת נזרקו משנים את הציון שלהם.
-      const carrySource = isDemoData ? null : previousSession;
-      const isShortSession = !!carrySource && SPOTS.some(s => cleanedInput[s.id] === undefined && carrySource.data[s.id] !== undefined);
-      const fullData = carrySource ? { ...carrySource.data, ...cleanedInput } : cleanedInput;
+      // אימון קצר - כשלא כל המיקומים הוזנו (למשל כי האימון היה קצר יותר). לא ממציאים נתונים
+      // למיקומים שלא נזרקו - הם פשוט לא נכללים באימון הזה, בדיוק כמו קודם. הסטטיסטיקות (גם
+      // הכלליות וגם לפי אזור) כבר מחשבות אחוז רק מתוך המיקומים שבאמת נזרקו, כך שזה תמיד יחסי
+      // למקסימום האמיתי ולא "משקר" את הנתונים. רק מוסיפים תיוג "אימון קצר" למידע.
+      const isShortSession = SPOTS.some(s => cleanedInput[s.id] === undefined);
 
       const newSession = {
         id: Date.now(),
         date: new Date().toISOString(),
         targetShots: settings.targetShots,
-        data: fullData,
+        data: cleanedInput,
         ...(isShortSession ? { isShort: true, notes: { general: '<b>היום היה אימון קצר</b>', zones: {} } } : {})
       };
 
@@ -622,6 +621,30 @@ export default function App() {
       if (journalSessionId === id) setJournalSessionId(null);
     }
   };
+
+  // בכניסה לדף ההזנה (לא בעריכת אימון ספציפי), אם האימון האחרון היה חלקי ("אימון קצר") ועדיין
+  // לא הוכרע לגביו - שואלים אם להמשיך אותו, ואם לא - האם למחוק אותו או להשאיר כפי שהוא.
+  useEffect(() => {
+    if (activeTab !== 'input' || editingId || isDemoData) return;
+    const last = sessions[0];
+    if (!last || !last.isShort || last.shortDismissed) return;
+
+    const filledCount = Object.keys(last.data).length;
+    const wantsToContinue = window.confirm(`האימון האחרון שלך היה חלקי (${filledCount} מתוך ${SPOTS.length} מיקומים). להמשיך אותו?`);
+    if (wantsToContinue) {
+      handleEdit(last);
+    } else if (window.confirm('למחוק את האימון החלקי הקודם? (אם לא, הוא יישאר שמור כפי שהוא)')) {
+      setSessions(prev => {
+        const filtered = prev.filter(s => s.id !== last.id);
+        if (filtered.length === 0) localStorage.removeItem(STORAGE_DATA_KEY);
+        return filtered;
+      });
+      if (journalSessionId === last.id) setJournalSessionId(null);
+    } else {
+      setSessions(prev => prev.map(s => s.id === last.id ? { ...s, shortDismissed: true } : s));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, editingId]);
 
   const updateSessionNotes = (sessionId, field, html) => {
     setSessions(prev => prev.map(s => {
