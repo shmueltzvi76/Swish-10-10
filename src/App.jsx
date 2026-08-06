@@ -935,14 +935,20 @@ export default function App() {
       list.push({ type: 'same', text: 'זהו האימון הראשון שלך שנשמר - מכאן והלאה תוכל לעקוב אחרי ההתקדמות שלך!' });
     }
 
+    // "האזור הכי חלש" הוא מסקנה שדורשת השוואה בין לפחות 2 אזורים שנזרקו באימון האחרון -
+    // באימון קצר שנגע רק באזור אחד, "הכי חלש מבין אזור אחד" לא אומר כלום ומייצר סתירה מול
+    // מסקנת "השתפר הכי הרבה" על אותו אזור בדיוק.
+    const touchedZonesCount = GROUP_ORDER.filter(g => stats.zoneData[g].lastAttempts > 0).length;
     let weakZone = null, weakPerc = Infinity;
-    GROUP_ORDER.forEach(g => {
-      const zd = stats.zoneData[g];
-      if (zd.lastAttempts > 0) {
-        const lp = Math.round((zd.lastMade / zd.lastAttempts) * 100);
-        if (lp < weakPerc) { weakPerc = lp; weakZone = g; }
-      }
-    });
+    if (touchedZonesCount > 1) {
+      GROUP_ORDER.forEach(g => {
+        const zd = stats.zoneData[g];
+        if (zd.lastAttempts > 0) {
+          const lp = Math.round((zd.lastMade / zd.lastAttempts) * 100);
+          if (lp < weakPerc) { weakPerc = lp; weakZone = g; }
+        }
+      });
+    }
     if (weakZone) {
       const zd = stats.zoneData[weakZone];
       let weakText = `הכי כדאי להתמקד באזור "${weakZone}": קלעת רק ${zd.lastMade}/${zd.lastAttempts} (${weakPerc}%) באימון האחרון`;
@@ -1511,9 +1517,9 @@ export default function App() {
                   const data = stats.zoneData[group];
                   if (data.allTimeAttempts === 0) return null;
 
-                  const lastPerc = data.lastAttempts > 0 ? Math.round((data.lastMade / data.lastAttempts) * 100) : 0;
+                  const lastPerc = data.lastAttempts > 0 ? Math.round((data.lastMade / data.lastAttempts) * 100) : null;
                   const prevPerc = data.prevAttempts > 0 ? Math.round((data.prevMade / data.prevAttempts) * 100) : null;
-                  const zoneTrend = comparisonSession ? getTrend(lastPerc, prevPerc) : null;
+                  const zoneTrend = (comparisonSession && lastPerc !== null) ? getTrend(lastPerc, prevPerc) : null;
                   const zoneTrendColor = zoneTrend ? TREND_COLORS[zoneTrend] : '#FF8A00';
                   const allPerc = Math.round((data.allTimeMade / data.allTimeAttempts) * 100);
 
@@ -1563,13 +1569,19 @@ export default function App() {
                               <p className="text-[9px] text-[#848B98] font-bold uppercase">אימון אחרון</p>
                               <p dir="ltr" className="text-[11px] text-[#A0A6B1]">{data.lastMade}/{data.lastAttempts}</p>
                             </div>
-                            <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
-                              <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
-                            </div>
-                            <div className="w-14 flex items-center justify-end gap-1">
-                              <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
-                              <TrendArrow trend={zoneTrend} size={11} />
-                            </div>
+                            {lastPerc !== null ? (
+                              <>
+                                <div className="flex-1 mx-3 bg-[#0F1115] h-1.5 rounded-full overflow-hidden shadow-inner">
+                                  <div className="h-full rounded-full" style={{ width: `${lastPerc}%`, backgroundColor: zoneTrendColor }} />
+                                </div>
+                                <div className="w-14 flex items-center justify-end gap-1">
+                                  <span className="font-black text-xs" style={{ color: zoneTrendColor }}>{lastPerc}%</span>
+                                  <TrendArrow trend={zoneTrend} size={11} />
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-[11px] text-[#596070] flex-1 text-center">לא נזרק באימון האחרון</p>
+                            )}
                           </div>
 
                           {/* פס כל הזמנים */}
