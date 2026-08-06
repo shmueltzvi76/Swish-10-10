@@ -642,7 +642,13 @@ export default function App() {
         const priorBest = priorPercs.length > 0 ? Math.max(...priorPercs) : null;
         if (newPerc !== null && priorBest !== null && newPerc > priorBest) {
           const ma = sessionMadeAttempts(newSession);
-          setRecordCelebration({ perc: newPerc, made: ma.made, total: ma.total });
+          setRecordCelebration({
+            perc: newPerc,
+            made: ma.made,
+            total: ma.total,
+            isShort: isShortSession,
+            spotsCount: Object.keys(cleanedInput).length
+          });
         }
 
         setSessions([newSession, ...sessions]);
@@ -847,12 +853,7 @@ export default function App() {
   // הוא עדיין לא כלול במערך sessions באותה נקודה. בעריכת אימון קיים, "הקודם" הוא האימון
   // האחרון שאינו זה שנערך כרגע.
   const previousSession = editingId ? sessions.find(s => s.id !== editingId) : (sessions[0] || null);
-  // האימון שלפני "האימון הקודם" - כדי לתת גם לערך הרפרנס בדף ההזנה צבע/מגמה משלו
-  const priorToPreviousSession = (() => {
-    if (!previousSession) return null;
-    const idx = sessions.findIndex(s => s.id === previousSession.id);
-    return idx >= 0 ? (sessions[idx + 1] || null) : null;
-  })();
+  const previousSessionIdx = previousSession ? sessions.findIndex(s => s.id === previousSession.id) : -1;
 
   const currentTargetShots = editingId
     ? (sessions.find(s => s.id === editingId)?.targetShots || settings.targetShots)
@@ -887,9 +888,6 @@ export default function App() {
     if (!ma || ma.total === 0) return null;
     return Math.round((ma.made / ma.total) * 100);
   };
-
-  const latestSessionPerc = useMemo(() => sessionOverallPerc(latestSession) ?? 0, [latestSession]);
-  const comparisonSessionPerc = useMemo(() => sessionOverallPerc(comparisonSession), [comparisonSession]);
 
   // === "תצוגה אפקטיבית" - לצורך תצוגה בלבד (מגרש + כרטיס "האימון האחרון שלך") ===
   // באימון קצר, המקומות שלא נזרקו לא צריכים "להיעלם" מהמגרש או לאפס את האחוז הכללי - הם
@@ -989,12 +987,18 @@ export default function App() {
   }, [sessions]);
 
   const graphData = useMemo(() => {
-    const raw = sessions.map(session => {
+    const raw = sessions.map((session, idx) => {
       let made = 0, total = 0;
 
       if (filterMode === 'overall') {
-        Object.values(session.data).forEach(v => made += v);
-        total = Object.keys(session.data).length * session.targetShots;
+        // אימון קצר לא אמור "לשקר" את ההתקדמות הכללית בגרף - במקום האחוז הגולמי שלו בלבד
+        // (שמחושב רק מתוך המקומות שנזרקו בו), ממזגים אותו עם מה שנזרק במקומות האחרים בפעם
+        // האחרונה שבה נזרקו, בדיוק כמו בכרטיס "האימון האחרון שלך" ובמגרש. באימון מלא זה
+        // תמיד זהה לחישוב הגולמי (כל המקומות כבר נמצאים בו), כך שאין שינוי התנהגות.
+        SPOTS.forEach(spot => {
+          const found = findEffectiveSpotValue(spot.id, idx);
+          if (found) { made += found.value; total += session.targetShots; }
+        });
       }
       else if (filterMode === 'zone') {
         SPOTS.filter(s => s.group === filterZone).forEach(spot => {
@@ -1020,21 +1024,41 @@ export default function App() {
       };
     });
     return raw.filter(d => d.hasData);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, filterMode, filterZone, filterSpot]);
 
   const insights = useMemo(() => {
     if (!latestSession || !stats) return [];
     const list = [];
 
-    if (comparisonSession && comparisonSessionPerc !== null) {
-      const diff = latestSessionPerc - comparisonSessionPerc;
-      const prevMA = sessionMadeAttempts(comparisonSession);
-      if (diff > 0) {
-        list.push({ type: 'up', text: `השתפרת ב-${diff}%: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, לעומת ${prevMA.made}/${prevMA.total} באימון הקודם. כל הכבוד!` });
-      } else if (diff < 0) {
-        list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)}%: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, לעומת ${prevMA.made}/${prevMA.total} באימון הקודם - זה קורה, תמשיך להתאמן.` });
-      } else {
-        list.push({ type: 'same', text: `נשארת יציב: קלעת ${stats.lastMade}/${stats.lastShots} באימון האחרון, בדיוק כמו באימון הקודם.` });
+    if (comparisonSession) {
+      // השוואה מוגבלת רק למקומות שבאמת נזרקו באימון האחרון - כדי לא להשוות אחוז של אימון
+      // קצר (למשל 3 מקומות) מול אחוז של אימון מלא (21 מקומות), שזו השוואה לא הוגנת. לכל מקום
+      // שנזרק, מחפשים מה נזרק בו בפעם הקודמת (גם אם זה לא היה דווקא באימון שממש לפני זה).
+      const touchedSpotIds = Object.keys(latestSession.data).map(Number);
+      let touchedPrevMade = 0, touchedPrevAttempts = 0, touchedPrevFoundCount = 0;
+      touchedSpotIds.forEach(spotId => {
+        const prevFound = findEffectiveSpotValue(spotId, 1);
+        if (prevFound) {
+          touchedPrevMade += prevFound.value;
+          touchedPrevAttempts += (comparisonSession.targetShots || settings.targetShots);
+          touchedPrevFoundCount++;
+        }
+      });
+
+      if (touchedPrevFoundCount > 0) {
+        const touchedPerc = Math.round((stats.lastMade / stats.lastShots) * 100);
+        const touchedPrevPerc = Math.round((touchedPrevMade / touchedPrevAttempts) * 100);
+        const diff = touchedPerc - touchedPrevPerc;
+        const scope = latestSession.isShort ? 'במקומות שקלעת באימון הקצר' : 'באימון האחרון';
+        const scopePrev = latestSession.isShort ? 'באותם מקומות בפעם הקודמת שנזרקו' : 'באימון הקודם';
+        if (diff > 0) {
+          list.push({ type: 'up', text: `השתפרת ב-${diff}% ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev}. כל הכבוד!` });
+        } else if (diff < 0) {
+          list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)}% ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev} - זה קורה, תמשיך להתאמן.` });
+        } else {
+          list.push({ type: 'same', text: `נשארת יציב ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, בדיוק כמו ${scopePrev}.` });
+        }
       }
 
       let bestZone = null, bestDelta = 0;
@@ -1082,7 +1106,8 @@ export default function App() {
     }
 
     return list;
-  }, [latestSession, comparisonSession, comparisonSessionPerc, latestSessionPerc, stats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latestSession, comparisonSession, stats]);
 
   const filterModeOptions = [
     { value: 'overall', label: 'ממוצע כולל (סה"כ)' },
@@ -1159,9 +1184,16 @@ export default function App() {
               <Trophy className="text-white w-10 h-10" />
             </div>
             <h3 className="text-2xl font-black text-white mb-1">שיא אישי חדש!</h3>
-            <p className="text-[#848B98] text-sm mb-5">האחוז הגבוה ביותר שלך אי פעם באימון שלם</p>
+            <p className="text-[#848B98] text-sm mb-5">
+              {recordCelebration.isShort ? 'האחוז הגבוה ביותר שלך אי פעם באימון' : 'האחוז הגבוה ביותר שלך אי פעם באימון שלם'}
+            </p>
             <p className="text-5xl font-black text-[#FF8A00] mb-1">{recordCelebration.perc}%</p>
-            <p dir="ltr" className="text-[#848B98] text-sm mb-6">{recordCelebration.made}/{recordCelebration.total}</p>
+            <p dir="ltr" className={`text-[#848B98] text-sm ${recordCelebration.isShort ? 'mb-2' : 'mb-6'}`}>{recordCelebration.made}/{recordCelebration.total}</p>
+            {recordCelebration.isShort && (
+              <p className="text-[#FF8A00] text-[11px] font-bold bg-[#FF8A00]/15 px-3 py-1.5 rounded-lg inline-block mb-6">
+                מאימון קצר - {recordCelebration.spotsCount} מתוך {SPOTS.length} מקומות שנזרקו
+              </p>
+            )}
             <button
               onClick={() => setRecordCelebration(null)}
               className="w-full bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115] font-black text-lg py-3.5 rounded-xl shadow-lg shadow-[#FF8A00]/20"
@@ -1473,9 +1505,14 @@ export default function App() {
                   <div className="p-2 divide-y divide-[#2A2F3D]/50">
                     {SPOTS.filter(s => s.group === group).map(spot => {
                       const val = currentInput[spot.id];
-                      const prevScore = previousSession?.data[spot.id];
+                      // חיפוש "אחורה" בהיסטוריה - אם האימון הקודם היה קצר ולא נגע במיקום הזה,
+                      // ממשיכים לחפש עד למציאת הערך האמיתי האחרון שהוזן בו, כדי שדף ההזנה תמיד
+                      // יראה נתונים עדכניים ולא "טרם הוזן בעבר" בטעות.
+                      const prevFound = previousSessionIdx >= 0 ? findEffectiveSpotValue(spot.id, previousSessionIdx) : null;
+                      const prevScore = prevFound?.value;
                       const liveTrend = (val !== undefined && val !== '' && prevScore !== undefined) ? getTrend(val, prevScore) : null;
-                      const priorScore = priorToPreviousSession?.data[spot.id];
+                      const priorFound = prevFound ? findEffectiveSpotValue(spot.id, prevFound.idx + 1) : null;
+                      const priorScore = priorFound?.value;
                       const prevTrend = prevScore !== undefined && priorScore !== undefined ? getTrend(prevScore, priorScore) : null;
                       const prevTrendColor = prevTrend ? TREND_COLORS[prevTrend] : '#FF8A00';
 
@@ -1550,9 +1587,15 @@ export default function App() {
                 </div>
 
                 {latestSession.isShort && (
-                  <div className="mt-3 pt-3 border-t border-[#2A2F3D]/60 flex justify-between items-center relative z-10">
-                    <p className="text-[#FF8A00] text-[10px] font-bold bg-[#FF8A00]/15 px-2 py-1 rounded-md">מהאימון הקצר בפועל</p>
-                    <p dir="ltr" className="text-[#A0A6B1] text-xs font-bold">{stats.lastMade} / {stats.lastShots} <span className="text-[#848B98]">({stats.lastPerc}%)</span></p>
+                  <div className="mt-3 pt-3 border-t border-[#2A2F3D]/60 flex justify-between items-end relative z-10">
+                    <div>
+                      <p className="text-xl font-black leading-none text-[#FF8A00]">{stats.lastPerc}<span className="text-sm">%</span></p>
+                      <p className="text-[#FF8A00] text-[9px] font-bold mt-1">מהאימון הקצר</p>
+                    </div>
+                    <div className="text-right">
+                      <p dir="ltr" className="text-[#A0A6B1] text-xs font-bold">{stats.lastMade} / {stats.lastShots}</p>
+                      <p className="text-[#848B98] text-[9px]">קליעות מהאימון הקצר</p>
+                    </div>
                   </div>
                 )}
               </div>
