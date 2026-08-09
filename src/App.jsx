@@ -923,16 +923,22 @@ export default function App() {
   const effectiveLatestPerc = effectiveLatestMA.total > 0 ? Math.round((effectiveLatestMA.made / effectiveLatestMA.total) * 100) : 0;
 
   const effectivePrevMA = useMemo(() => {
-    const prevValues = Object.entries(effectiveLatestMerge)
-      .map(([spotId, found]) => findEffectiveSpotValue(Number(spotId), found.idx + 1)?.value)
-      .filter(v => v !== undefined);
-    if (!prevValues.length) return null;
+    if (sessions.length < 2) return null;
+    // "תמונת מצב" עצמאית ואחידה נכון לרגע שלפני האימון האחרון (מתחילים לחפש מאינדקס 1
+    // והלאה, בדיוק כמו effectiveLatestMerge אך בהיסט של אימון אחד) - לא ניחוש לפי המקור
+    // שממנו הגיע כל עמדה בהיווצרות הנוכחית, שהיה עלול "לדלג" עמדות ולתת תוצאה מוטה.
+    const entries = [];
+    SPOTS.forEach(spot => {
+      const found = findEffectiveSpotValue(spot.id, 1);
+      if (found) entries.push(found.value);
+    });
+    if (!entries.length) return null;
     return {
-      made: prevValues.reduce((a, b) => a + b, 0),
-      total: prevValues.length * (comparisonSession?.targetShots || settings.targetShots)
+      made: entries.reduce((a, b) => a + b, 0),
+      total: entries.length * (comparisonSession?.targetShots || settings.targetShots)
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveLatestMerge, comparisonSession, settings.targetShots]);
+  }, [sessions, comparisonSession, settings.targetShots]);
 
   const effectivePrevPerc = effectivePrevMA && effectivePrevMA.total > 0 ? Math.round((effectivePrevMA.made / effectivePrevMA.total) * 100) : null;
   const effectiveOverallTrend = getTrend(effectiveLatestPerc, effectivePrevPerc);
@@ -1046,16 +1052,20 @@ export default function App() {
         }
       });
 
-      if (touchedPrevFoundCount > 0) {
-        const touchedPerc = Math.round((stats.lastMade / stats.lastShots) * 100);
-        const touchedPrevPerc = Math.round((touchedPrevMade / touchedPrevAttempts) * 100);
-        const diff = touchedPerc - touchedPrevPerc;
+      if (touchedPrevFoundCount > 0 && effectivePrevMA && effectivePrevMA.total > 0) {
+        // חשוב: אחוז "השתפרת/ירדת ב-X%" מחושב כתרומה האמיתית לתמונה הכוללת (מתוך כל 210
+        // הזריקות האפשריות), לא כהפרש הגולמי בין האחוזים במקומות שנזרקו בלבד. אחרת, שיפור
+        // קטן בכמה מקומות באימון קצר היה נראה כמו "קפיצה" דרמטית שלא באמת קיימת ביחס לתמונה
+        // המלאה. מוצג עם נקודה עשרונית כשצריך, כדי לא לאבד דיוק כשההשפעה האמיתית קטנה.
+        const weightedDiff = (effectiveLatestMA.made / effectiveLatestMA.total - effectivePrevMA.made / effectivePrevMA.total) * 100;
+        const diffRounded = Math.round(weightedDiff * 10) / 10;
+        const formatPerc = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         const scope = latestSession.isShort ? 'במקומות שקלעת באימון הקצר' : 'באימון האחרון';
         const scopePrev = latestSession.isShort ? 'באותם מקומות בפעם הקודמת שנזרקו' : 'באימון הקודם';
-        if (diff > 0) {
-          list.push({ type: 'up', text: `השתפרת ב-${diff}% ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev}. כל הכבוד!` });
-        } else if (diff < 0) {
-          list.push({ type: 'down', text: `ירדת ב-${Math.abs(diff)}% ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev} - זה קורה, תמשיך להתאמן.` });
+        if (diffRounded > 0) {
+          list.push({ type: 'up', text: `השתפרת ב-${formatPerc(diffRounded)}% מהתמונה הכוללת: קלעת ${stats.lastMade}/${stats.lastShots} ${scope}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev}. כל הכבוד!` });
+        } else if (diffRounded < 0) {
+          list.push({ type: 'down', text: `ירדת ב-${formatPerc(Math.abs(diffRounded))}% מהתמונה הכוללת: קלעת ${stats.lastMade}/${stats.lastShots} ${scope}, לעומת ${touchedPrevMade}/${touchedPrevAttempts} ${scopePrev} - זה קורה, תמשיך להתאמן.` });
         } else {
           list.push({ type: 'same', text: `נשארת יציב ${scope}: קלעת ${stats.lastMade}/${stats.lastShots}, בדיוק כמו ${scopePrev}.` });
         }
@@ -1107,7 +1117,7 @@ export default function App() {
 
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestSession, comparisonSession, stats]);
+  }, [latestSession, comparisonSession, stats, effectiveLatestMA, effectivePrevMA]);
 
   const filterModeOptions = [
     { value: 'overall', label: 'ממוצע כולל (סה"כ)' },
