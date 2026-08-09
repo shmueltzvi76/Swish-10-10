@@ -124,14 +124,8 @@ const DialogHost = () => {
   const close = (result) => { dialog.resolve(result); setDialog(null); };
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in"
-      onClick={() => close(false)}
-    >
-      <div
-        className="bg-[#1C202A] rounded-3xl border border-[#2A2F3D] shadow-2xl w-full max-w-[320px] p-6 animate-in zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-[#1C202A] rounded-3xl border border-[#2A2F3D] shadow-2xl w-full max-w-[320px] p-6 animate-in zoom-in-95">
         {dialog.title && <h3 className="text-white font-bold text-base mb-2">{dialog.title}</h3>}
         <p className="text-[#E0E2E7] text-sm leading-relaxed whitespace-pre-line">{dialog.message}</p>
         <div className="flex gap-3 mt-6">
@@ -944,6 +938,29 @@ export default function App() {
   const effectiveOverallTrend = getTrend(effectiveLatestPerc, effectivePrevPerc);
   const effectiveOverallTrendColor = effectiveOverallTrend ? TREND_COLORS[effectiveOverallTrend] : '#FF8A00';
 
+  // "עלייה מהאימון הקודם" ו"שיא חדש" הם לא אותו דבר - עלייה היא רק ביחס לנקודה הקודמת,
+  // בעוד ששיא הוא ביחס לכל ההיסטוריה. חשוב: ההשוואה כאן חייבת להיות מול "האחוז האפקטיבי"
+  // (הממוזג, מתוך כל 210 הזריקות) של כל אימון עבר - בדיוק כמו המספר שמוצג ליד התג הזה -
+  // ולא מול האחוז הגולמי של אימון קצר (שמחושב רק מתוך המקומות שנזרקו בו ויכול לקפוץ גבוה
+  // בקלות בלי לשקף שיא אמיתי בתמונה הכוללת).
+  const effectivePercAtIndex = (idx) => {
+    const merged = {};
+    for (let i = idx; i < sessions.length && Object.keys(merged).length < SPOTS.length; i++) {
+      SPOTS.forEach(spot => {
+        if (merged[spot.id] === undefined && sessions[i].data[spot.id] !== undefined) merged[spot.id] = sessions[i].data[spot.id];
+      });
+    }
+    const vals = Object.values(merged);
+    if (!vals.length) return null;
+    const total = vals.length * (sessions[idx]?.targetShots || settings.targetShots);
+    return Math.round((vals.reduce((a, b) => a + b, 0) / total) * 100);
+  };
+  const priorBestEffectivePerc = (() => {
+    const percs = sessions.slice(1).map((_, i) => effectivePercAtIndex(i + 1)).filter(p => p !== null);
+    return percs.length > 0 ? Math.max(...percs) : null;
+  })();
+  const isAllTimeRecord = priorBestEffectivePerc !== null && effectiveLatestPerc > priorBestEffectivePerc;
+
   const stats = useMemo(() => {
     if (!sessions.length) return null;
     let totalMade = 0, totalShots = 0;
@@ -1476,7 +1493,7 @@ export default function App() {
               </p>
               {comparisonSession && (
                 <div className="flex items-center justify-center gap-3 mt-1 text-[9px] text-[#848B98]">
-                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.up }}></span>שיא חדש</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.up }}></span>עלייה</span>
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.same }}></span>ללא שינוי</span>
                   <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: TREND_COLORS.down }}></span>ירידה</span>
                 </div>
@@ -1584,7 +1601,11 @@ export default function App() {
                     <p className="text-4xl font-black leading-none" style={{ color: effectiveOverallTrendColor }}>{effectiveLatestPerc}<span className="text-xl">%</span></p>
                     {effectiveOverallTrend && (
                       <p className="text-[10px] font-bold mt-1 flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>
-                        {effectiveOverallTrend === 'up' && <><ArrowUp size={11} /> שיא חדש!</>}
+                        {effectiveOverallTrend === 'up' && (
+                          isAllTimeRecord
+                            ? <><ArrowUp size={11} /> שיא חדש!</>
+                            : <><ArrowUp size={11} /> עלייה מהאימון הקודם{priorBestEffectivePerc !== null ? ` - טרם שברת את השיא (${priorBestEffectivePerc}%)` : ''}</>
+                        )}
                         {effectiveOverallTrend === 'down' && <><ArrowDown size={11} /> ירידה מהאימון הקודם</>}
                         {effectiveOverallTrend === 'same' && <><Minus size={11} /> ללא שינוי</>}
                       </p>
