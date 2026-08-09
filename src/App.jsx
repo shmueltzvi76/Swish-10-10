@@ -11,6 +11,11 @@ const getTrend = (current, previous) => {
   return 'same';
 };
 
+// מציג אחוז עם נקודה עשרונית אחת רק כשצריך לדיוק (למשל 41.4%) - לא תמיד מספר עגול, כדי
+// שהפרש בין שני אחוזים מוצגים תמיד יתאים בדיוק להפרש שמדווח במסקנות, בלי "לאבד" חלקי אחוז
+// בעיגול נפרד של כל צד.
+const formatPerc = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+
 // אייקון חץ קטן שמלווה צבע מגמה (עלייה/ירידה/ללא שינוי) כדי שהצבע לא יישאר חידה
 const TrendArrow = ({ trend, size = 12, className = '' }) => {
   if (!trend) return null;
@@ -914,7 +919,9 @@ export default function App() {
     };
   }, [effectiveLatestMerge, latestSession, settings.targetShots]);
 
-  const effectiveLatestPerc = effectiveLatestMA.total > 0 ? Math.round((effectiveLatestMA.made / effectiveLatestMA.total) * 100) : 0;
+  // ללא עיגול לשלם - נשמר מדויק כדי שהפרש בין שני אחוזים מוצגים תמיד יתאים בדיוק להפרש
+  // שמדווח במסקנות ("השתפרת ב-X%"), ולא ייראה סותר בגלל עיגול נפרד של כל צד בנפרד.
+  const effectiveLatestPerc = effectiveLatestMA.total > 0 ? (effectiveLatestMA.made / effectiveLatestMA.total) * 100 : 0;
 
   const effectivePrevMA = useMemo(() => {
     if (sessions.length < 2) return null;
@@ -934,7 +941,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions, comparisonSession, settings.targetShots]);
 
-  const effectivePrevPerc = effectivePrevMA && effectivePrevMA.total > 0 ? Math.round((effectivePrevMA.made / effectivePrevMA.total) * 100) : null;
+  const effectivePrevPerc = effectivePrevMA && effectivePrevMA.total > 0 ? (effectivePrevMA.made / effectivePrevMA.total) * 100 : null;
   const effectiveOverallTrend = getTrend(effectiveLatestPerc, effectivePrevPerc);
   const effectiveOverallTrendColor = effectiveOverallTrend ? TREND_COLORS[effectiveOverallTrend] : '#FF8A00';
 
@@ -953,7 +960,7 @@ export default function App() {
     const vals = Object.values(merged);
     if (!vals.length) return null;
     const total = vals.length * (sessions[idx]?.targetShots || settings.targetShots);
-    return Math.round((vals.reduce((a, b) => a + b, 0) / total) * 100);
+    return (vals.reduce((a, b) => a + b, 0) / total) * 100;
   };
   const priorBestEffectivePerc = (() => {
     const percs = sessions.slice(1).map((_, i) => effectivePercAtIndex(i + 1)).filter(p => p !== null);
@@ -1076,7 +1083,6 @@ export default function App() {
         // המלאה. מוצג עם נקודה עשרונית כשצריך, כדי לא לאבד דיוק כשההשפעה האמיתית קטנה.
         const weightedDiff = (effectiveLatestMA.made / effectiveLatestMA.total - effectivePrevMA.made / effectivePrevMA.total) * 100;
         const diffRounded = Math.round(weightedDiff * 10) / 10;
-        const formatPerc = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
         const scope = latestSession.isShort ? 'במקומות שקלעת באימון הקצר' : 'באימון האחרון';
         const scopePrev = latestSession.isShort ? 'באותם מקומות בפעם הקודמת שנזרקו' : 'באימון הקודם';
         if (diffRounded > 0) {
@@ -1421,7 +1427,7 @@ export default function App() {
                 className="text-left px-3 py-1.5 rounded-xl border"
                 style={{ background: `linear-gradient(to bottom right, ${effectiveOverallTrendColor}33, ${effectiveOverallTrendColor}0D)`, borderColor: `${effectiveOverallTrendColor}33` }}
               >
-                <p className="text-xl font-black flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>{effectiveLatestPerc}%<TrendArrow trend={effectiveOverallTrend} size={14} /></p>
+                <p className="text-xl font-black flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>{formatPerc(effectiveLatestPerc)}%<TrendArrow trend={effectiveOverallTrend} size={14} /></p>
               </div>
             </div>
 
@@ -1598,13 +1604,13 @@ export default function App() {
                 </div>
                 <div className="flex justify-between items-end relative z-10">
                   <div>
-                    <p className="text-4xl font-black leading-none" style={{ color: effectiveOverallTrendColor }}>{effectiveLatestPerc}<span className="text-xl">%</span></p>
+                    <p className="text-4xl font-black leading-none" style={{ color: effectiveOverallTrendColor }}>{formatPerc(effectiveLatestPerc)}<span className="text-xl">%</span></p>
                     {effectiveOverallTrend && (
                       <p className="text-[10px] font-bold mt-1 flex items-center gap-1" style={{ color: effectiveOverallTrendColor }}>
                         {effectiveOverallTrend === 'up' && (
                           isAllTimeRecord
                             ? <><ArrowUp size={11} /> שיא חדש!</>
-                            : <><ArrowUp size={11} /> עלייה מהאימון הקודם{priorBestEffectivePerc !== null ? ` - טרם שברת את השיא (${priorBestEffectivePerc}%)` : ''}</>
+                            : <><ArrowUp size={11} /> עלייה מהאימון הקודם{priorBestEffectivePerc !== null ? ` - טרם שברת את השיא (${formatPerc(priorBestEffectivePerc)}%)` : ''}</>
                         )}
                         {effectiveOverallTrend === 'down' && <><ArrowDown size={11} /> ירידה מהאימון הקודם</>}
                         {effectiveOverallTrend === 'same' && <><Minus size={11} /> ללא שינוי</>}
