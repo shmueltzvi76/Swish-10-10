@@ -1222,6 +1222,8 @@ export default function App() {
   footer { text-align: center; margin-top: 24px; }
   footer p { font-size: 13px; color: #A0A6B1; margin-bottom: 10px; }
   footer a { display: inline-block; background: linear-gradient(90deg,#FF8A00,#E55D00); color: #0F1115; font-weight: 900; font-size: 14px; padding: 12px 24px; border-radius: 14px; text-decoration: none; }
+  .demo-banner { display: flex; align-items: center; gap: 8px; border: 1px dashed rgba(255,138,0,0.5); background: rgba(255,138,0,0.1); border-radius: 14px; padding: 10px 12px; margin-bottom: 16px; }
+  .demo-banner p { font-size: 11px; font-weight: 700; color: #FF8A00; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -1233,6 +1235,11 @@ export default function App() {
         <p class="date">דוח התקדמות · ${dateStr}</p>
       </div>
     </header>
+
+    ${isDemoData ? `<div class="demo-banner">
+      <span>⚠️</span>
+      <p>שים לב: אלו נתוני הדגמה בלבד לצורך היכרות עם האפליקציה - לא נתוני אימון אמיתיים.</p>
+    </div>` : ''}
 
     <div class="stat-grid">
       <div class="stat-tile">
@@ -1747,7 +1754,7 @@ export default function App() {
         {activeTab === 'stats' && stats && !showSettingsModal && (
           <div className="p-4 animate-in fade-in space-y-6 pb-10">
 
-            {!isDemoData && latestSession && (
+            {latestSession && (
               <button
                 onClick={shareProgressReport}
                 className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#FF8A00] to-[#E55D00] text-[#0F1115] font-black text-sm py-3.5 rounded-2xl shadow-lg shadow-[#FF8A00]/20 active:scale-95 transition-transform"
